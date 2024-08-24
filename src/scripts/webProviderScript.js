@@ -91,9 +91,16 @@ function displayMessage(message, sender) {
 }
 
 function parseAndDisplayResponse(aiResponse) {
+  if (typeof aiResponse !== "string") {
+    return;
+  }
+
   // Regular expression to match code blocks
   const codeRegex = /(.*?):\s*(\w+);\s*{([^}]+)}(.*)/s;
   const match = aiResponse.match(codeRegex);
+  const conversationContainer = document.getElementById("conversation");
+  const aiMessage = document.createElement("div");
+  aiMessage.className = "ai-message";
 
   if (match) {
     const textBeforeCode = match[1]; // Text before the code block
@@ -106,7 +113,7 @@ function parseAndDisplayResponse(aiResponse) {
       const preCodeContainer = document.createElement("div");
       preCodeContainer.className = "pre-code-container";
       preCodeContainer.innerText = textBeforeCode.trim();
-      document.getElementById("conversation").appendChild(preCodeContainer);
+      aiMessage.appendChild(preCodeContainer);
     }
 
     // Create and append the div for the code block
@@ -123,15 +130,42 @@ function parseAndDisplayResponse(aiResponse) {
 
     codeContainer.appendChild(clipboardIcon);
     codeContainer.appendChild(codeBlock);
-    document.getElementById("conversation").appendChild(codeContainer);
+    aiMessage.appendChild(codeContainer);
 
     // Create and append the div for remaining text
     if (remainingText.trim()) {
       const postCodeContainer = document.createElement("div");
       postCodeContainer.className = "post-code-container";
       postCodeContainer.innerText = remainingText.trim();
-      document.getElementById("conversation").appendChild(postCodeContainer);
+      aiMessage.appendChild(postCodeContainer);
     }
+
+    const clipboardIconContainer = document.createElement("div");
+    clipboardIconContainer.className = "clipboard-icon-container tooltip";
+    clipboardIconContainer.onclick = () => {
+      copyToClipboard(
+        aiMessage.innerText.replaceAll("📋", "").replace("Copy", "")
+      );
+    };
+
+    const toolTipCopyMessage = document.createElement("span");
+    toolTipCopyMessage.className = "tooltiptext";
+    toolTipCopyMessage.innerHTML = "Copy";
+    clipboardIconContainer.appendChild(toolTipCopyMessage);
+
+    const clipboardIcon_ = document.createElement("span");
+    clipboardIcon_.className = "clipboard-icon-messages";
+    clipboardIcon_.innerText = "📋";
+
+    clipboardIconContainer.appendChild(clipboardIcon_);
+
+    const messageOptions = document.createElement("div");
+    messageOptions.className = "message-options";
+    messageOptions.appendChild(clipboardIconContainer);
+
+    aiMessage.appendChild(messageOptions);
+    conversationContainer.appendChild(aiMessage);
+    conversationContainer.scrollTop = conversationContainer.scrollHeight; // Scroll to the bottom
   } else {
     // If no code block, display the entire response as regular text
     displayMessage(aiResponse, "ai");

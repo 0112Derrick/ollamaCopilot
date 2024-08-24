@@ -10,11 +10,7 @@
     "Other"
   ],
   "activationEvents": [
-    "onLanguage:plaintext",
-    "onLanguage:javascript",
-    "onLanguage:typescript",
-    "onStartupFinished",
-    "onView:calicoColors.colorsView"
+    "onStartupFinished"
   ],
   "main": "./dist/extension.js",
   "contributes": {

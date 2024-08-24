@@ -1,7 +1,8 @@
 import * as vscode from "vscode";
 
 class MyCompletionItemProvider implements vscode.CompletionItemProvider {
-  public completionItems: vscode.CompletionItem[] = [];
+  private completionItems: vscode.CompletionItem[] = [];
+  private previousSuggestions: vscode.CompletionItem[] = [];
 
   addNewCompletionItem(label: string, item: string) {
     const _item = new vscode.CompletionItem(
@@ -11,6 +12,21 @@ class MyCompletionItemProvider implements vscode.CompletionItemProvider {
     _item.detail = label + " " + item;
 
     this.completionItems.push(_item);
+  }
+
+  clearSuggestions(): void {
+    this.previousSuggestions = [...this.completionItems];
+    this.completionItems = [];
+  }
+
+  restoreSuggestions(): boolean {
+    if (this.previousSuggestions.length === 0) {
+      return false;
+    }
+
+    this.completionItems = [...this.previousSuggestions];
+    this.previousSuggestions = [];
+    return true;
   }
 
   provideCompletionItems(

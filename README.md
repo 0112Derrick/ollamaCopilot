@@ -1,20 +1,55 @@
 # ollama-copilot README
 
-This is the README for your extension "ollama-copilot". After writing up a brief description, we recommend including the following sections.
+This extension integrates AI capabilities into VS Code, providing intelligent code suggestions, detecting boilerplate code, and offering inline completions. It also includes a Webview interface for user interactions with the AI, enhancing coding efficiency and productivity.
+
+## Installation
+
+Remote:
+Install [Ollama](https://ollama.com/) on dedicated machine and configure endpoint to it in extension settings. Ollama usually uses port 11434 and binds to 127.0.0.1, to change it you should set OLLAMA_HOST to 0.0.0.0.
+
+Local:
+Install [Ollama](https://ollama.com) on local machine and then launch the extension in VSCode, everything should work as it is.
+
+Github: [Ollama Github](https://github.com/ollama/ollama)
+
+## Recommend Hardware
+
+Minimum required RAM: 8GB is a minimum, more is better since even smallest model takes 5GB of RAM. The best way: dedicated machine with RTX 4090. Install [Ollama](https://ollama.com) on this machine and configure endpoint in extension settings to offload to this machine. Second best way: run on MacBook M1/M2/M3 with enough RAM (more == better, but 10gb extra would be enough). For windows notebooks: it runs good with decent GPU, but dedicated machine with a good GPU is recommended. Perfect if you have a dedicated gaming PC.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+Ollama webview
+![media](media/features/ollamaWebview.png)
 
-For example if there is an image subfolder under your extension project workspace:
+Directly interact with whatever model you are running by using the webview from the chat extension.
 
-\!\[feature X\]\(images/feature-x.png\)
+You can also query the model inline:
+![media](media/features/inlinePrompt.png)
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+Once a response is received it will store it in your suggestions which you can see by typing '/'
+![media](media/features/inlineResponse.png)
+
+The app will scan your current document every 25 secs checking for boiler plate code in order to speed up the development process.
+
+`Commands:`
+
+- / - will open the suggestions menu if you have any suggestions.
+
+- //ai {prompt} - Will send an inline query to the model.
+
+- //ai clear - Will empty your ai suggestions box. It keeps a backup.
+
+- //ai restore - Will restore your ai suggestions if you have any.
+
+> Tip: Smaller models may not understand the instructions needed to have the extension work properly. Recommended model is llama3 or higher.
 
 ## Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+A working server that will listen to post commands at the set url. This server should return string JSON in order for the application to process it correctly.
+
+By default the app will listen to `http://localhost:11434/api/generate` because this is the default port of Ollama.
+
+By default the app will use `llama3` for the model name in the request.
 
 ## Extension Settings
 
@@ -24,48 +59,29 @@ For example:
 
 This extension contributes the following settings:
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+- `Set Ollama URL`: Sets where the api request will go to. This is useful if you want to host the model on a separate machine or use a server in the middle of your requests. By default set to `http://localhost:11434/api/generate`
+- `Set Ollama Model`: Sets the model name included in the request. By default set to: `llama3`
 
 ## Known Issues
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+- No ability to cancel requests.
+- No ability to turn off model.
+- Does not prompt users what model or url their model is running on in the event of an error.
+- Cannot set ai trigger for the inline prompts.
+- No ability to take in images.
 
-## Release Notes
+## Troubleshooting
 
-Users appreciate release notes as you update your extension.
+If you are getting an error it most likely means your model is not running or your extension settings are not pointed to your correct model / url.
 
-### 1.0.0
+## Changelog
 
-Initial release of ...
+### 0.0.5
 
-### 1.0.1
+Initial release of Ollama copilot
 
-Fixed issue #.
+## Contributing
 
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
+Ollama_copilot is open-source under the MIT license. See the [LICENSE](./LICENSE) for more details.
 
 **Enjoy!**

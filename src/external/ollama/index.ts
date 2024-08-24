@@ -11,16 +11,16 @@ export async function generateChatCompletion(
   query: string,
   model: string = llama3.name,
   url: string = defaultURL,
-  headers: { [key: string]: string } = {}
+  headers: { [key: string]: string } = {},
+  stream: boolean = false
 ) {
   try {
-    console.log(headers);
     const config = { headers };
 
     const data_ = {
       model,
       prompt: query,
-      stream: false,
+      stream: stream,
     };
 
     for (let i = 0; i < 3; i++) {
