@@ -1,16 +1,20 @@
 import axios from "axios";
+import * as vscode from "vscode";
+import { isValidJson } from "../../utils";
+import { MessageRoles } from "../../providers/webViewProvider";
 
 export const llama3 = {
   maxToken: 4096,
   name: "llama3",
 };
 
-export const defaultURL = "http://localhost:11434/api/generate";
+export const defaultURLChatCompletion = "http://localhost:11434/api/generate";
+export const defaultURLChat = "http://localhost:11434/api/chat";
 
-export async function generateChatCompletion(
+export async function generateCompletion(
   query: string,
   model: string = llama3.name,
-  url: string = defaultURL,
+  url: string = defaultURLChatCompletion,
   headers: { [key: string]: string } = {},
   stream: boolean = false
 ) {
@@ -36,6 +40,66 @@ export async function generateChatCompletion(
     return "Unable to receive JSON in the correct format after multiple attempts.";
   } catch (error) {
     console.error("Error generating chat completion:", error);
+    vscode.window.showErrorMessage(
+      "An error occurred: Error generating chat completion: " + error
+    );
     return "Error connecting to the server.";
+  }
+}
+
+//Chat with an AI model
+export async function generateChatCompletion(
+  systemPrompt: string,
+  model: string = llama3.name,
+  url: string = defaultURLChat,
+  headers: { [key: string]: string } = {},
+  stream: boolean = false,
+  chatHistory: { role: MessageRoles; content: string }[] = []
+): Promise<
+  | {
+      model: string;
+      created_at: string;
+      message: { role: string; content: string };
+      done_reason: string;
+      done: boolean;
+      total_duration: number;
+      load_duration: number;
+      prompt_eval_count: number;
+      prompt_eval_duration: number;
+      eval_count: number;
+      eval_duration: number;
+    }
+  | string
+> {
+  try {
+    const config = {
+      headers: { "Content-Type": "application/json", ...headers },
+    };
+
+    const data_ = {
+      model: model,
+      messages: chatHistory,
+      stream: stream,
+      system: systemPrompt,
+    };
+
+    console.log(
+      `url: ${url} |data: ${JSON.stringify(data_)} | config: ${JSON.stringify(
+        config
+      )}`
+    );
+    const response = await axios.post(url, data_, config);
+
+    if (typeof response.data === "string" && isValidJson(response.data)) {
+      return JSON.parse(response.data);
+    } else {
+      return response.data ? response.data : "Error generating a response.";
+    }
+  } catch (error) {
+    console.error("Error: " + error);
+    vscode.window.showErrorMessage(
+      "An error occurred: Error generating chat completion: " + error
+    );
+    return `Error: ${error}`;
   }
 }

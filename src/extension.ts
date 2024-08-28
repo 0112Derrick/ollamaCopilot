@@ -1,5 +1,9 @@
 import * as vscode from "vscode";
-import { llama3, defaultURL } from "./external/ollama";
+import {
+  llama3,
+  defaultURLChatCompletion,
+  defaultURLChat,
+} from "./external/ollama";
 import { WebviewViewProvider } from "./providers/webViewProvider";
 import completionProvider from "./providers/completionProvider";
 import {
@@ -7,6 +11,7 @@ import {
   promptForModel,
   promptForOllamaHeaders,
   promptForOllamaURL,
+  promptForOllamaURLChat,
   queryAiOnUserQueryInTextDoc,
 } from "./scripts";
 import { COMMANDS } from "./utils";
@@ -29,6 +34,12 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand("ollama-copilot.setOllamaHeaders", () => {
       promptForOllamaHeaders(context);
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("ollama-copilot.setURL_WebView", () => {
+      promptForOllamaURLChat(context);
     })
   );
 
@@ -56,11 +67,19 @@ export async function activate(context: vscode.ExtensionContext) {
 
     const model = context.globalState.get<string>("ollamaModel", llama3.name);
 
-    const ollamaUrl = context.globalState.get<string>("ollamaURL", defaultURL);
+    const ollamaUrl = context.globalState.get<string>(
+      "ollamaURL",
+      defaultURLChatCompletion
+    );
 
     const ollamaHeaders = context.globalState.get<string>(
       "ollamaHeaders",
       "{}"
+    );
+
+    const ollamaUrlChat = context.globalState.get<string>(
+      "ollamaURLChat",
+      defaultURLChat
     );
 
     const checkAndInsertSuggestion = async () => {
@@ -74,9 +93,7 @@ export async function activate(context: vscode.ExtensionContext) {
         const lineText = line.text.trim();
         const languageId = document.languageId;
 
-        const systemPrompt = `System Prompt: Return in string format code that responds to the user query. You will only ever return code and nothing else. Do not respond with any other statements other than the code or code comments. Ensure your answer is correct and only return the best version of your answer. Ensure that you match how the user codes (variables, functions vs objects, loops). Example: Create a variable that says hello world in javascript response: "let helloWorld = 'hello world'"; Respond to the user query in the following language ${
-          languageId === "text" ? "typescript" : languageId
-        }. User query:`;
+        const systemPrompt = `Return in string format code that responds to the user query. You will only ever return code and nothing else. Do not respond with any other statements other than the code or code comments. If you do make comments make sure to wrap the comment in block comments e.g: /* comment */. Ensure your answer is correct and only return the best version of your answer. Ensure that you match how the user codes (variables, functions vs objects, loops).`;
 
         if (
           (lineText.startsWith(COMMANDS.aiTrigger) || lineText === "") &&
@@ -84,6 +101,9 @@ export async function activate(context: vscode.ExtensionContext) {
         ) {
           if (position.line < 0 || position.line >= document.lineCount) {
             console.error(`Invalid line number: ${position.line}`);
+            vscode.window.showErrorMessage(
+              `An error occurred: Invalid line number: ${position.line}`
+            );
             return;
           }
 
@@ -92,6 +112,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
           if (newPosition.line < 0 || newPosition.line >= document.lineCount) {
             console.error(`Invalid new position line: ${newPosition.line}`);
+            vscode.window.showErrorMessage(
+              `An error occurred: Invalid new position line: ${newPosition.line}`
+            );
             return;
           }
 
@@ -110,8 +133,11 @@ export async function activate(context: vscode.ExtensionContext) {
               editor,
               document,
               model,
-              ollamaUrl,
-              ollamaHeaders
+              ollamaUrlChat,
+              ollamaHeaders,
+              `${
+                languageId === "text" ? "typescript" : languageId
+              }.`
             );
           } else if (newLineText === COMMANDS.clearSuggestionsCommand) {
             //ANCHOR - Clear suggestions
@@ -136,15 +162,12 @@ export async function activate(context: vscode.ExtensionContext) {
         }
       } catch (e) {
         console.error("Error: ", e);
+        vscode.window.showErrorMessage("An error occurred: " + e);
       }
     };
 
     if (
       event.contentChanges.some((change) => {
-        console.log("change in doc: " + change.text);
-        console.log(
-          `New line: ${change.text.trim() === "\n" ? "true" : "false"}`
-        );
         return change.text.includes("\n");
       })
     ) {

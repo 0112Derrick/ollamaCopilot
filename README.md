@@ -81,7 +81,7 @@ If you are getting an error it most likely means your model is not running or yo
 Initial release of Ollama copilot
 
 ## Contributing
-
+data = response.message.content;
 Ollama_copilot is open-source under the MIT license. See the [LICENSE](./LICENSE) for more details.
 
 **Enjoy!**

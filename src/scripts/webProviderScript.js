@@ -92,6 +92,11 @@ function displayMessage(message, sender) {
 
 function parseAndDisplayResponse(aiResponse) {
   if (typeof aiResponse !== "string") {
+    vscode.postMessage({
+      command: "logError",
+      text: `Invalid response message: \nReceived:${typeof aiResponse} | Expected a string.`,
+    });
+
     return;
   }
 
@@ -183,13 +188,20 @@ function copyToClipboard(text) {
     })
     .catch((err) => {
       console.error("Failed to copy code: ", err);
+      vscode.window.showErrorMessage("Failed to copy code: " + err.message);
     });
 }
 
+window.onerror = (message, source, lineno, colno, error) => {
+  vscode.postMessage({
+    command: "logError",
+    text: `Error: ${message} at ${source}:${lineno}:${colno}`,
+  });
+};
+
 window.addEventListener("message", (event) => {
   const message = event.data;
-  console.log("Received message in webview:", event.data);
-  console.log("Received message:", message);
+  // console.log(JSON.stringify(message));
   switch (message.command) {
     case "displayResponse":
       parseAndDisplayResponse(message.response);
@@ -203,10 +215,20 @@ window.addEventListener("message", (event) => {
         fileContent: fileContent,
       });
       updateAppendedDocumentsUI();
+      break;
+    case "logError":
+      vscode.postMessage({
+        command: "logError",
+        text: `An error occurred: ${message.text}`,
+      });
 
       break;
     default:
       console.log("Unknown command:", message.command);
+      vscode.postMessage({
+        command: "logError",
+        text: `Unknown command: ${message.command}`,
+      });
       break;
   }
 });

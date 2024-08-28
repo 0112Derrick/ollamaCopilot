@@ -26,6 +26,10 @@
       {
         "command": "ollama-copilot.setOllamaHeaders",
         "title": "Set Ollama Headers"
+      },
+      {
+        "command": "ollama-copilot.setURL_WebView",
+        "title": "Set Ollama webview url"
       }
     ],
     "viewsContainers": {
