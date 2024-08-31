@@ -1,13 +1,87 @@
 textarea {
   resize: none;
 }
+
 * {
   box-sizing: border-box;
 }
 
+:root {
+  --white: #fff;
+  --black: #000;
+  --gray-50: #f9f9f9;
+  --gray-100: #ececec;
+  --gray-200: #e3e3e3;
+  --gray-300: #cdcdcd;
+  --gray-400: #b4b4b4;
+  --gray-500: #9b9b9b;
+  --gray-600: #676767;
+  --gray-700: #424242;
+  --gray-750: #2f2f2f;
+  --gray-800: #212121;
+  --gray-900: #171717;
+  --gray-950: #0d0d0d;
+  --red-500: #ef4444;
+  --red-700: #b91c1c;
+  --brand-purple: #ab68ff;
+}
+
+.dark {
+  --composer-surface: rgba(50, 50, 50, 0.8);
+  --composer-bar_mask-grace-area: 55px;
+  --text-primary: var(--gray-100);
+  --text-secondary: var(--gray-400);
+  --text-tertiary: var(--gray-500);
+  --text-quaternary: var(--gray-600);
+  --text-placeholder: hsla(0, 0%, 100%, 0.8);
+  --text-error: #f93a37;
+  --border-light: hsla(0, 0%, 100%, 0.1);
+  --border-medium: hsla(0, 0%, 100%, 0.15);
+  --border-heavy: hsla(0, 0%, 100%, 0.2);
+  --border-xheavy: hsla(0, 0%, 100%, 0.25);
+  --border-sharp: hsla(0, 0%, 100%, 0.05);
+  --main-surface-primary: var(--gray-800);
+  --main-surface-secondary: var(--gray-750);
+  --main-surface-tertiary: var(--gray-700);
+  --sidebar-surface-primary: var(--gray-900);
+  --sidebar-surface-secondary: var(--gray-800);
+  --sidebar-surface-tertiary: var(--gray-750);
+  --link: #7ab7ff;
+  --link-hover: #5e83b3;
+  --surface-error: 249 58 55;
+}
+
+html {
+  --composer-surface: hsla(0, 0%, 94%, 0.9);
+  --composer-bar_mask-grace-area: 25px;
+  --text-primary: var(--gray-950);
+  --text-secondary: #7d7d7d;
+  --text-tertiary: var(--gray-400);
+  --text-quaternary: var(--gray-300);
+  --tag-blue: #08f;
+  --tag-blue-light: #0af;
+  --text-error: #f93a37;
+  --text-placeholder: rgba(0, 0, 0, 0.7);
+  --surface-error: 249 58 55;
+  --border-light: rgba(0, 0, 0, 0.1);
+  --border-medium: rgba(0, 0, 0, 0.15);
+  --border-heavy: rgba(0, 0, 0, 0.2);
+  --border-xheavy: rgba(0, 0, 0, 0.25);
+  --border-sharp: rgb(0 0 0/5%);
+  --main-surface-primary: var(--white);
+  --main-surface-secondary: var(--gray-50);
+  --main-surface-tertiary: var(--gray-100);
+  --sidebar-surface-primary: var(--gray-50);
+  --sidebar-surface-secondary: var(--gray-100);
+  --sidebar-surface-tertiary: var(--gray-200);
+  --link: #2964aa;
+  --link-hover: #749ac8;
+  --selection: #007aff;
+}
+
 body {
   font-family: Arial, sans-serif;
-  background-color: #000000;
+  background-color: #171717;
   margin: 0;
   padding: 0;
   height: 100vh;
@@ -22,22 +96,98 @@ body {
   height: 80%;
   max-width: 600px;
   min-width: 300px;
+  position: relative;
   margin: auto;
   padding: 20px;
   border: 1px solid #ccc;
   border-radius: 8px;
-  background-color: #444444;
+  background-color: #212121;
   display: flex;
   flex-direction: column;
+}
+
+#chatsContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-items: center;
+  flex: 1;
+  width: 90%;
+  height: 90%;
+}
+
+/* The side panel (hidden by default) */
+.side-panel {
+  height: 100%; /* Full-height */
+  width: 0; /* Initial width */
+  position: absolute; /* Stay in place */
+  z-index: 1; /* Sit on top */
+  top: 0;
+  left: 0;
+  background-color: #111; /* Black*/
+  overflow-x: hidden; /* Disable horizontal scroll */
+  transition: 0.5s; /* 0.5 second transition effect to slide in the panel */
+  padding-top: 60px; /* Place content 60px from the top */
+}
+
+/* Side panel content */
+.side-panel a {
+  padding: 8px 8px 8px 32px;
+  text-decoration: none;
+  font-size: 25px;
+  color: #818181;
+  display: block;
+  transition: 0.3s;
+}
+
+/* Close button on the side panel */
+.side-panel .closebtn {
+  position: absolute;
+  top: 0;
+  right: 25px;
+  font-size: 36px;
+  margin-left: 50px;
+}
+
+/* When you mouse over the navigation links, change their color */
+.side-panel a:hover {
+  color: #f1f1f1;
+}
+
+.closebtn {
+  cursor: pointer;
+}
+
+.side-panel .closebtn:hover {
+  color: var(--red-700);
+}
+
+#openSidePanelBtn:hover {
+  padding: 2px;
+  background: #9a9a9a76;
+  border-radius: 4px;
+}
+
+.recentChats {
+  width: 100%;
+  padding: 4px;
+  border-radius: 4px;
+  background-color: inherit;
+  cursor: pointer;
+}
+
+.recentChats:hover {
+  background-color: var(--gray-700);
 }
 
 .navMenu {
   display: flex;
   width: 100%;
-  height: 20px;
+  height: 32px;
   align-items: center;
   justify-items: start;
   gap: 4px;
+  padding: 8px;
 }
 
 .navMenu > div {
@@ -61,6 +211,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
 }
 
 .displayContainer {
@@ -109,7 +260,8 @@ body {
   border-radius: 4px;
   position: relative;
   margin: 10px 0;
-  width: 80%;
+  width: 85%;
+  overflow-x: auto;
 }
 
 .code-container pre {
@@ -168,14 +320,95 @@ body {
   position: relative;
 }
 
+#ollamaImg {
+  border-radius: 50%;
+  height: 125px;
+  aspect-ratio: 1/1;
+  align-self: center;
+}
+
+.ollama-message-icon {
+  border-radius: 50%;
+  height: 35px;
+  aspect-ratio: 1/1;
+}
+
+.flex {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.flex-nowrap {
+  display: flex;
+  gap: 8px;
+}
+
+.justifyCenter {
+  justify-content: center;
+}
+
+.itemsCenter {
+  align-items: center;
+}
+
+.pt-4 {
+  padding-top: 4px;
+}
+
+.suggestionsContainer {
+  margin: 40px 0;
+}
+
+.promptSuggestions {
+  background: inherit;
+  border-radius: 4px;
+  padding: 5px;
+  cursor: pointer;
+  border: 1px solid;
+  border-color: var(--gray-700);
+  width: 100px;
+  height: 75px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.promptSuggestions:hover {
+  border-color: var(--gray-600);
+}
+
 #userQuery {
   width: 100%;
+  height: auto;
   padding: 10px;
+  padding-left: 15px;
+  background: #606060;
+  color: #fff;
   border: 1px solid #ddd;
-  border-radius: 4px;
+  border-radius: 25px;
   position: absolute;
   bottom: 0;
   left: 0;
+  line-height: 1.5;
+}
+
+#userQuery::placeholder {
+  color: #f9f9f9;
+  padding-top: 10px;
+}
+
+/* For older Firefox versions */
+#userQuery::-moz-placeholder {
+  color: #f9f9f9;
+  padding-top: 10px;
+}
+
+/* For older Internet Explorer versions */
+#userQuery:-ms-input-placeholder {
+  color: #f9f9f9;
+  padding-top: 10px;
 }
 
 .appended-documents-container {
@@ -216,25 +449,26 @@ body {
   /* background-color: inherit; */
   border-radius: 50%;
   color: #00000027;
-  background: #bebebe;
+  background: #717171;
   position: absolute;
   bottom: 10%;
   right: 5px;
+  transform: scale(0.9);
   /* transform: translateY(-10%); */
 }
 
 #addFileButton {
   /* padding: 3px 5px; */
-  color: #000;
+  color: #fff;
   right: 45px;
   cursor: pointer;
   background: none;
 }
 
 .icon-2xl {
-  background: inherit;
-  border-radius: 50%;
-  transform: scale(1.1);
+  background: none;
+  /* border-radius: 50%; */
+  transform: scale(1.3);
 }
 
 #loadingIndicator {
@@ -266,7 +500,7 @@ body {
 }
 
 .tooltiptext {
-  top: 100%;
+  top: 110%;
   left: 50%;
   transform: translateX(-50%);
 }

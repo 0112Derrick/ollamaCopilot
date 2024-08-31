@@ -4,7 +4,7 @@ import {
   defaultURLChatCompletion,
   defaultURLChat,
 } from "./external/ollama";
-import { WebviewViewProvider } from "./providers/webViewProvider";
+import { WebViewProvider } from "./providers/webViewProvider";
 import completionProvider from "./providers/completionProvider";
 import {
   backgroundQueryForBoilerPlateCode,
@@ -46,7 +46,7 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       "ollamaView",
-      new WebviewViewProvider(context)
+      new WebViewProvider(context)
     )
   );
 
@@ -135,9 +135,7 @@ export async function activate(context: vscode.ExtensionContext) {
               model,
               ollamaUrlChat,
               ollamaHeaders,
-              `${
-                languageId === "text" ? "typescript" : languageId
-              }.`
+              `${languageId === "text" ? "typescript" : languageId}.`
             );
           } else if (newLineText === COMMANDS.clearSuggestionsCommand) {
             //ANCHOR - Clear suggestions
@@ -154,7 +152,7 @@ export async function activate(context: vscode.ExtensionContext) {
             backgroundQueryForBoilerPlateCode(
               lastCheckTime,
               model,
-              ollamaUrl,
+              ollamaUrlChat,
               ollamaHeaders,
               document
             );

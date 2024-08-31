@@ -80,6 +80,7 @@ export async function generateChatCompletion(
       model: model,
       messages: chatHistory,
       stream: stream,
+      options: { repeat_penalty: 1.2 },
       system: systemPrompt,
     };
 

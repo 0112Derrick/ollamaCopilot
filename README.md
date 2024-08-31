@@ -7,6 +7,14 @@ This extension integrates AI capabilities into VS Code, providing intelligent co
 Remote:
 Install [Ollama](https://ollama.com/) on dedicated machine and configure endpoint to it in extension settings. Ollama usually uses port 11434 and binds to 127.0.0.1, to change it you should set OLLAMA_HOST to 0.0.0.0.
 
+Running a forwarding server on host machine:
+Ctrl+Shift+P or Cmd+Shift+P: Change ollama url to HostMachine.ip.address:port e.g: http://192.168.1.100:3000/forward
+Requirement: Node installed on host machine.
+npm install the dependencies of the forwarding server.
+Run the server.
+(Javascript | axios | cors)
+[Forwarding sever](./proxy-server.js)
+
 Local:
 Install [Ollama](https://ollama.com) on local machine and then launch the extension in VSCode, everything should work as it is.
 
@@ -81,6 +89,7 @@ If you are getting an error it most likely means your model is not running or yo
 Initial release of Ollama copilot
 
 ## Contributing
+
 data = response.message.content;
 Ollama_copilot is open-source under the MIT license. See the [LICENSE](./LICENSE) for more details.
 

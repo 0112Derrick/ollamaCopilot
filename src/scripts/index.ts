@@ -162,8 +162,8 @@ export const backgroundQueryForBoilerPlateCode = async (
 
   lastCheckTime = currentTime;
 
-  let aiResponse: { isBoilerPlateCode: boolean; code: string } = {
-    isBoilerPlateCode: false,
+  let aiResponse: { isBoilerPlateCode: boolean | undefined; code: string } = {
+    isBoilerPlateCode: undefined,
     code: "",
   };
 
@@ -181,10 +181,7 @@ export const backgroundQueryForBoilerPlateCode = async (
         false,
         [{ role: "user", content: query }]
       );
-      let aiResponse = {
-        isBoilerPlateCode: "",
-        code: "",
-      };
+
       //console.log(`\npre-parse response: ${r}  type: ${typeof r}\n`);
 
       // let response = await generateCompletion(
@@ -219,9 +216,9 @@ export const backgroundQueryForBoilerPlateCode = async (
 
         if (
           Object.hasOwn(aiResponse, "isBoilerPlateCode") &&
+          aiResponse.isBoilerPlateCode !== undefined &&
           Object.hasOwn(aiResponse, "code")
         ) {
-          aiResponse = response;
           console.log("boiler plate: ", aiResponse.isBoilerPlateCode);
           console.log("code: ", aiResponse.code);
           break;
