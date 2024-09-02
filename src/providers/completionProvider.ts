@@ -41,3 +41,36 @@ class MyCompletionItemProvider implements vscode.CompletionItemProvider {
 
 const completionProvider = new MyCompletionItemProvider();
 export default completionProvider;
+
+
+
+/* {
+  "name": "ghost-text-completion",
+  "displayName": "Ghost Text Completion",
+  "description": "Provides inline ghost text completions",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:javascript",
+    "onLanguage:typescript"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": []
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.60.0",
+    "@types/node": "^14.14.37",
+    "typescript": "^4.3.5"
+  }
+} */

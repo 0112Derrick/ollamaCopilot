@@ -6,6 +6,7 @@ import {
   defaultURLChatCompletion,
   defaultURLChat,
 } from "../external/ollama";
+import inlineCompletionProvider from "../providers/inlineCompletionProvider";
 import completionProvider from "../providers/completionProvider";
 import { COMMANDS, isValidJson } from "../utils";
 import exp from "constants";
@@ -117,10 +118,6 @@ export const queryAiOnUserQueryInTextDoc = async (
     }
   }
 
-  // if (typeof response !== "string" || response.trim() === "") {
-  //   response = "Unable to connect to ollama.";
-  // }
-
   const updatedLine = editor.document.lineAt(newLine.range.start.line);
   const updatedLineRange = updatedLine.range;
 
@@ -145,13 +142,12 @@ export const backgroundQueryForBoilerPlateCode = async (
   ollamaHeaders: string,
   document: vscode.TextDocument
 ) => {
-  console.log("Checking doc for boiler plate code.");
-
+  console.log("\nChecking doc for boiler plate code.\n");
   const currentTime = Date.now();
 
   console.log(
     `ct:${currentTime} lt:${lastCheckTime} result: ${
-      currentTime - lastCheckTime < 25000
+      currentTime - lastCheckTime < 3 * 1000 // check sec timeout
     }`
   );
 
@@ -168,7 +164,33 @@ export const backgroundQueryForBoilerPlateCode = async (
   };
 
   let retry = 3;
-  const query = `Does the code in the document look like boiler plate code? document: ${document.getText()}. If it is boiler plate code then send json in the following format: {"isBoilerPlateCode": true,"code":"Insert the finished boiler plate code here."}. In all other cases send back json like this: {"isBoilerPlateCode": false, "code": ""}. Do not send any code that already exists in the document (If you wish to make a change to an existing class or function send a code comment e.g: {"isBoilerPlateCode": true, "code": "//change class X to add in Y property" }. Only send JSON.)`;
+  // const query = `Does the code in the document look like boiler plate code or can you auto complete what the user is attempting to type? document: ${document.getText()}. If it is boiler plate code then send json in the following format: {"isBoilerPlateCode": true,"code":"Insert the finished boiler plate code here."}. In all other cases send back json like this: {"isBoilerPlateCode": false, "code": ""}. Do not send any code that already exists in the document (If you wish to make a change to an existing class or function send a code comment e.g: {"isBoilerPlateCode": true, "code": "//change class X to add in Y property" }. Only send JSON.)`;
+  const query = `Analyze the following code and respond ONLY with a JSON object. Do not include any explanation or comments.
+
+Document content:
+\`\`\`
+${document.getText()}
+\`\`\`
+
+Task:
+1. Determine if this is boilerplate code or user code that needs autocompletion.
+2. If it's boilerplate code, complete it fully.
+3. If it's user code, attempt to autocomplete the next logical part.
+
+Response format:
+{
+  "isBoilerPlateCode": boolean,
+  "code": string
+}
+
+Rules:
+- The "code" field should contain ONLY code, no comments or explanations.
+- For boilerplate code, provide the complete code.
+- For user code autocompletion, provide only the next logical part, not repeating existing code.
+- Ensure the response is valid JSON.
+- Do not repeat any code that was provided.
+- Do not include any text outside the JSON object.`;
+
   const systemPrompt =
     "Match how the user codes and do not include any new feature, code that exists in the document already, and if the user has a class that already exists do not retype it in your response. Keep your code clean and concise with code comments. Do not send any code that already exists in the document. Only send JSON.";
   try {
@@ -184,12 +206,6 @@ export const backgroundQueryForBoilerPlateCode = async (
 
       //console.log(`\npre-parse response: ${r}  type: ${typeof r}\n`);
 
-      // let response = await generateCompletion(
-      //   query,
-      //   model,
-      //   ollamaUrl,
-      //   JSON.parse(ollamaHeaders)
-      // );
       console.log(
         `\npre-parse response: ${response}  type: ${typeof response}\n`
       );
@@ -234,22 +250,24 @@ export const backgroundQueryForBoilerPlateCode = async (
       }
     }
 
-    if (
-      typeof aiResponse !== "object" ||
-      aiResponse.code.trim() === "" ||
-      aiResponse.isBoilerPlateCode === false
-    ) {
+    if (typeof aiResponse !== "object" || aiResponse.code.trim() === "") {
       return;
     }
 
     console.log("Ai response: " + aiResponse.code);
-    completionProvider.addNewCompletionItem(
-      "Code suggestion:",
-      aiResponse.code
+    const uniqueAiResponse = removeDuplicateCode(
+      aiResponse.code,
+      document.getText()
     );
-    await vscode.commands.executeCommand("type", {
-      text: COMMANDS.aiResponseMenuTrigger,
-    });
+    inlineCompletionProvider.setInlineSuggestion(uniqueAiResponse);
+    // completionProvider.addNewCompletionItem(
+    //   "Code suggestion:",
+    //   aiResponse.code
+    // );
+
+    // await vscode.commands.executeCommand("type", {
+    //   text: COMMANDS.aiResponseMenuTrigger,
+    // });
   } catch (e) {
     console.error(e);
   }
@@ -343,4 +361,25 @@ export async function promptForOllamaHeaders(context: vscode.ExtensionContext) {
       `Ollama headers set to: ${JSON.stringify(formattedHeaders, null)}`
     );
   }
+}
+
+function removeDuplicateCode(aiResponse: string, documentText: string): string {
+  // Split both the AI response and document text into lines
+  const aiLines = aiResponse.split("\n");
+  const docLines = documentText.split("\n");
+
+  // Function to normalize a line of code for comparison
+  const normalizeLine = (line: string) => line.trim().replace(/\s+/g, " ");
+
+  // Create a Set of normalized document lines for faster lookup
+  const docLinesSet = new Set(docLines.map(normalizeLine));
+
+  // Filter out duplicate lines from AI response
+  const uniqueAiLines = aiLines.filter((line) => {
+    const normalizedLine = normalizeLine(line);
+    return !docLinesSet.has(normalizedLine) && normalizedLine !== "";
+  });
+
+  // Join the unique lines back into a string
+  return uniqueAiLines.join("\n");
 }

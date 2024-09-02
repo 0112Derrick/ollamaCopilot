@@ -1,9 +1,31 @@
+import { isValidJson } from "../utils";
+
 declare function acquireVsCodeApi(): {
   postMessage: (message: any) => void;
   getState: () => any;
   setState: (newState: any) => void;
 };
 const vscode = acquireVsCodeApi();
+
+function replacer(key: string, value: any) {
+  if (value instanceof Map) {
+    return {
+      dataType: "Map",
+      value: Array.from(value.entries()), // Convert Map to array of key-value pairs
+    };
+  } else {
+    return value;
+  }
+}
+
+function reviver(key: string, value: any) {
+  if (typeof value === "object" && value !== null) {
+    if (value.dataType === "Map") {
+      return new Map(value.value); // Convert back to Map from array of key-value pairs
+    }
+  }
+  return value;
+}
 
 let ollamaImgPromise: Promise<string> = new Promise((resolve) => {
   window.addEventListener("message", (event) => {
@@ -14,13 +36,31 @@ let ollamaImgPromise: Promise<string> = new Promise((resolve) => {
   });
 });
 
-const requestImageUri = () => {
-  vscode.postMessage({
-    command: "requestImageUri",
-  });
-};
-
-requestImageUri();
+let ollamaChatHistoryPromise: Promise<ChatContainer> = new Promise(
+  (resolve) => {
+    window.addEventListener("message", (event) => {
+      const message = event.data;
+      if (message.command === "setChatHistory") {
+        if (isValidJson(message.data)) {
+          resolve(JSON.parse(message.data, reviver));
+        } else {
+          resolve(
+            new Map<
+              string,
+              {
+                lastUpdatedTime: number;
+                conversationHtml: string;
+                conversationLog: { role: MessageRoles; content: string }[];
+                label: string;
+                queriesMade: number;
+              }
+            >()
+          );
+        }
+      }
+    });
+  }
+);
 
 function getCurrentDate() {
   const now = new Date();
@@ -47,6 +87,52 @@ const addEventListenerToClass = (
   });
 };
 
+function reattachEventListeners() {
+  const copyButtons: NodeListOf<HTMLElement> = document.querySelectorAll(
+    ".clipboard-icon-messages"
+  );
+
+  copyButtons.forEach((button) => {
+    button.addEventListener("click", (event) => {
+      const parentDiv = (event.target as HTMLElement).closest(
+        ".user-message, .ai-message"
+      );
+
+      if (!parentDiv) {
+        return;
+      }
+
+      let textToCopy = "";
+      if (parentDiv.classList.contains("user-message")) {
+        const messageOptions = parentDiv.querySelector(".message-options");
+        if (!messageOptions) {
+          return;
+        }
+        textToCopy = messageOptions.previousSibling?.textContent
+          ? messageOptions.previousSibling?.textContent
+          : "";
+      } else if (parentDiv.classList.contains("ai-message")) {
+        const aiMessage = parentDiv.querySelector(".flex-nowrap");
+        if (!aiMessage) {
+          return;
+        }
+        textToCopy = aiMessage.children[1].textContent
+          ? aiMessage.children[1].textContent
+          : "";
+      }
+
+      navigator.clipboard
+        .writeText(textToCopy)
+        .then(() => {
+          console.info("Text was copied to the clipboard.");
+        })
+        .catch((err) => {
+          console.error("Failed to copy text: ", err);
+        });
+    });
+  });
+}
+
 type userMessageRole = "user";
 type toolMessageRole = "tool";
 type assistantMessageRole = "assistant";
@@ -58,18 +144,43 @@ type MessageRoles =
   | assistantMessageRole
   | systemMessageRole;
 
-async function main() {
-  const conversationsContainer = new Map<
-    string,
-    {
-      lastUpdatedTime: number;
-      conversationHtml: string;
-      conversationLog: { role: MessageRoles; content: string }[];
-      label: string;
-      queriesMade: number;
-    }
-  >();
+type ChatContainer = Map<
+  string,
+  {
+    lastUpdatedTime: number;
+    conversationHtml: string;
+    conversationLog: { role: MessageRoles; content: string }[];
+    label: string;
+    queriesMade: number;
+  }
+>;
 
+const requestData = () => {
+  vscode.postMessage({
+    command: "requestImageUri",
+  });
+
+  vscode.postMessage({
+    command: "getChat",
+  });
+};
+
+requestData();
+
+async function main() {
+  const conversationsContainer: ChatContainer = await ollamaChatHistoryPromise;
+
+  console.log("Map: ", conversationsContainer);
+
+  if (!conversationsContainer) {
+    console.warn("Conversation container failed to resolve.");
+    return;
+  }
+
+  const ollamaImg = await ollamaImgPromise;
+  console.log(`\nImg: , ${ollamaImg}\n`);
+
+  let selectedUUID = "";
   let documentsAppendedToQuery: any[] = [];
   let queriesMade: number = 0;
 
@@ -102,10 +213,6 @@ async function main() {
   ) as HTMLElement;
   const addFileButton = document.querySelector("#addFileButton") as HTMLElement;
 
-  let ollamaImg = await ollamaImgPromise;
-
-  let selectedUUID = "";
-
   // console.log("\nOllama img\n", ollamaImg);
   const initialConversationView = `
         <img id="ollamaImg" src=${ollamaImg} alt="Ollama"/>
@@ -117,23 +224,33 @@ async function main() {
         </div>`;
 
   const handleRecentChatClicked = (id: string) => {
-    //FIXME - Implement this.
-    /* 
+    if (!conversation || !conversationsContainer) {
+      return;
+    }
+    /*
     When a recent chat is clicked. search for its uuid. Check the conversationsContainer and set the conversation html element equal to conversationData.
     Update chat history in the extension.
-    set queries made
+    Set queriesMade
     */
-    console.log("Clicked");
-    console.log("selected uuid: ", id);
-    let data = conversationsContainer.get(id);
-    console.log("conversation container: ", conversationsContainer);
-    if (data) {
-      console.log("Data: " + JSON.stringify(data));
-      console.log("Label: " + data.label);
+    if (id !== selectedUUID) {
+      console.log("Clicked");
+      console.log("selected uuid: ", id);
+      let data = conversationsContainer.get(id);
+      console.log("conversation container: ", conversationsContainer);
+      if (data) {
+        console.log("Data: " + JSON.stringify(data));
+        console.log("Label: " + data.label);
+        conversation.innerHTML = data.conversationHtml;
+        queriesMade = data.queriesMade;
+        //NOTE - Update the conversation log in the app.
+        vscode.postMessage({
+          command: "setChatHistory",
+          chatHistory: data.conversationLog,
+        });
+      }
     }
   };
 
-  //FIXME - unknown id bug
   const handleCreateConversation = () => {
     if (!conversation) {
       return;
@@ -185,10 +302,8 @@ async function main() {
     sendButton.removeEventListener("mouseleave", handleMouseLeave);
   };
 
-  //FIXME - Look at me
-  /* UpdateConversationContainer is being triggered when a new chat window is created and updating the selectedUUID */
   const updateConversationContainer = () => {
-    if (!conversation || !recentChatsContainer) {
+    if (!conversation || !recentChatsContainer || !conversationsContainer) {
       return;
     }
 
@@ -197,9 +312,12 @@ async function main() {
         console.log("Creating a new conversation log: " + selectedUUID);
         const newRecentChat = document.createElement("div");
         newRecentChat.className = "recentChats";
-        newRecentChat.addEventListener("click", () => {
-          handleRecentChatClicked(selectedUUID);
-        });
+        newRecentChat.addEventListener(
+          "click",
+          ((uuid) => () => {
+            handleRecentChatClicked(uuid);
+          })(selectedUUID)
+        );
         newRecentChat.innerText = selectedUUID;
 
         recentChatsContainer.appendChild(newRecentChat);
@@ -252,7 +370,9 @@ async function main() {
     return;
   }
 
-  if (conversationsContainer.size) {
+  //Checks to see if conversationsContainer has any values already and uses the users previous chat to display, instead of the new chat screen.
+  if (conversationsContainer && conversationsContainer.size) {
+    conversation.style.justifyContent = "flex-start";
     let uuid = 0;
     for (let [key, val] of conversationsContainer.entries()) {
       if (val.lastUpdatedTime > uuid) {
@@ -261,7 +381,7 @@ async function main() {
       }
       recentChatsContainer.insertAdjacentHTML(
         "beforeend",
-        `<div class="recentChats">${key}</div>`
+        `<div class="recentChats">${val.label ? val.label : key}</div>`
       );
     }
     document.querySelectorAll(".recentChats").forEach((div, index) => {
@@ -272,14 +392,16 @@ async function main() {
       );
     });
     console.log("Setting to previous conversation: " + selectedUUID);
+    const selectedConversation = conversationsContainer.get(selectedUUID);
+    if (selectedConversation) {
+      queriesMade = selectedConversation.queriesMade;
+      conversation.innerHTML = selectedConversation.conversationHtml;
+      //reattaches copy button event listeners.
+      reattachEventListeners();
+    }
   } else {
     selectedUUID = createUUID();
     console.log("No previous conversations");
-  }
-
-  if (selectedUUID && conversationsContainer.has(selectedUUID)) {
-    conversation.innerHTML =
-      conversationsContainer.get(selectedUUID)!.conversationHtml;
   }
 
   console.log(
@@ -330,6 +452,14 @@ async function main() {
     } else {
       deactivateSendButton();
       userQuery.style.height = "auto";
+    }
+  });
+
+  userQuery.addEventListener("keypress", function (e) {
+    if (e.key === "Enter") {
+      if (userQuery.value.trim() !== "") {
+        promptAI(userQuery.value);
+      }
     }
   });
 
@@ -404,8 +534,9 @@ async function main() {
     }
 
     displayMessage(query, "user");
-
-    if (!conversationsContainer.has(selectedUUID)) {
+    console.log("Container ", conversationsContainer);
+    console.log(typeof conversationsContainer);
+    if (conversationsContainer && !conversationsContainer.has(selectedUUID)) {
       vscode.postMessage({
         command: "getLabelName",
         query: query,
@@ -604,68 +735,101 @@ async function main() {
     });
   };
 
-  window.addEventListener("message", (event) => {
-    const message = event.data;
-    // console.log(JSON.stringify(message));
-    switch (message.command) {
-      case "displayResponse":
-        parseAndDisplayResponse(message.response);
-        break;
-      case "fileSelected":
-        const fileName = message.fileName;
-        const fileContent = message.content;
+  const windowListener = () => {
+    window.addEventListener("message", (event) => {
+      const message = event.data;
+      // console.log(JSON.stringify(message));
+      switch (message.command) {
+        case "displayResponse":
+          parseAndDisplayResponse(message.response);
+          break;
+        case "fileSelected":
+          const fileName = message.fileName;
+          const fileContent = message.content;
 
-        documentsAppendedToQuery.push({
-          fileName: fileName,
-          fileContent: fileContent,
-        });
-        updateAppendedDocumentsUI();
-        break;
-      case "updateChatHistory":
-        if (conversationsContainer.has(selectedUUID)) {
-          let data = conversationsContainer.get(selectedUUID);
-          if (data) {
-            data.lastUpdatedTime = Date.now();
-            data.conversationLog = message.chatHistory;
-            conversationsContainer.set(selectedUUID, data);
+          documentsAppendedToQuery.push({
+            fileName: fileName,
+            fileContent: fileContent,
+          });
+          updateAppendedDocumentsUI();
+          break;
+        case "updateChatHistory":
+          if (!conversationsContainer || !conversationsContainer.size) {
+            console.warn(
+              "Conversation container is undefined or empty. ",
+              conversationsContainer
+            );
+            return;
           }
-        }
-        break;
-      case "logError":
-        vscode.postMessage({
-          command: "logError",
-          text: `An error occurred: ${message.text}`,
-        });
-        break;
-      case "setLabelName":
-        if (message.id) {
-          if (conversationsContainer.has(message.id)) {
-            conversationsContainer.set(message.id, message.label);
-            if (recentChatsContainer) {
-              // Find the child element with innerText matching message.id
-              const children = recentChatsContainer.children;
-              for (let i = 0; i < children.length; i++) {
-                const child = children[i] as HTMLElement;
-                if (child.innerText === message.id) {
-                  // Update the innerText of the matching child element
-                  child.innerText = message.label;
-                  break; // Exit the loop once the item is found and updated
+          console.log("update chat history:", selectedUUID);
+          if (conversationsContainer.has(selectedUUID)) {
+            let data = conversationsContainer.get(selectedUUID);
+            if (data) {
+              data.lastUpdatedTime = Date.now();
+              data.conversationLog = message.chatHistory;
+              conversationsContainer.set(selectedUUID, data);
+            }
+          }
+          //FIXME - I AM EMPTY!!!
+
+          console.log(
+            "Conversation container pre save: ",
+            conversationsContainer
+          );
+          let saveData = JSON.stringify(conversationsContainer, replacer);
+          console.log("Saving chat history: " + saveData);
+          vscode.postMessage({
+            command: "saveChat",
+            data: saveData,
+          });
+          break;
+        case "logError":
+          vscode.postMessage({
+            command: "logError",
+            text: `An error occurred: ${message.text}`,
+          });
+          break;
+        case "setLabelName":
+          if (!conversationsContainer) {
+            return;
+          }
+          if (message.id) {
+            if (conversationsContainer.has(message.id)) {
+              let data = conversationsContainer.get(message.id);
+              if (data) {
+                conversationsContainer.set(message.id, {
+                  ...data,
+                  label: message.label,
+                });
+              }
+              if (recentChatsContainer) {
+                // Find the child element with innerText matching message.id
+                const children = recentChatsContainer.children;
+                for (let i = 0; i < children.length; i++) {
+                  const child = children[i] as HTMLElement;
+                  if (child.innerText === message.id) {
+                    // Update the innerText of the matching child element
+                    child.innerText = message.label;
+                    break; // Exit the loop once the item is found and updated
+                  }
                 }
               }
             }
           }
-        }
-        break;
+          break;
 
-      default:
-        console.error("Unknown command:", message.command);
-        vscode.postMessage({
-          command: "logError",
-          text: `Unknown command: ${message.command}`,
-        });
-        break;
-    }
-  });
+        default:
+          console.error("Unknown command:", message.command);
+          vscode.postMessage({
+            command: "logError",
+            text: `Unknown command: ${message.command}`,
+          });
+          break;
+      }
+    });
+  };
+
+  windowListener();
 
   function openSidePanel() {
     const sidePanel = document.getElementById("sidePanel");

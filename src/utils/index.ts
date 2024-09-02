@@ -1,5 +1,8 @@
 export function isValidJson(str: string): boolean {
   try {
+    if (str.trim() === "") {
+      return false;
+    }
     JSON.parse(str);
     return true;
   } catch (e) {
