@@ -147,7 +147,7 @@ export const backgroundQueryForBoilerPlateCode = async (
 
   console.log(
     `ct:${currentTime} lt:${lastCheckTime} result: ${
-      currentTime - lastCheckTime < 3 * 1000 // check sec timeout
+      currentTime - lastCheckTime < 5 * 1000 // check sec timeout
     }`
   );
 
@@ -164,7 +164,6 @@ export const backgroundQueryForBoilerPlateCode = async (
   };
 
   let retry = 3;
-  // const query = `Does the code in the document look like boiler plate code or can you auto complete what the user is attempting to type? document: ${document.getText()}. If it is boiler plate code then send json in the following format: {"isBoilerPlateCode": true,"code":"Insert the finished boiler plate code here."}. In all other cases send back json like this: {"isBoilerPlateCode": false, "code": ""}. Do not send any code that already exists in the document (If you wish to make a change to an existing class or function send a code comment e.g: {"isBoilerPlateCode": true, "code": "//change class X to add in Y property" }. Only send JSON.)`;
   const query = `Analyze the following code and respond ONLY with a JSON object. Do not include any explanation or comments.
 
 Document content:
@@ -175,7 +174,8 @@ ${document.getText()}
 Task:
 1. Determine if this is boilerplate code or user code that needs autocompletion.
 2. If it's boilerplate code, complete it fully.
-3. If it's user code, attempt to autocomplete the next logical part.
+3. Think through the problem carefully and solve for both things that the developer is currently solving and potentially unaware they need to solve as well.
+4. If it's user code, attempt to autocomplete the next logical part.
 
 Response format:
 {
@@ -204,8 +204,6 @@ Rules:
         [{ role: "user", content: query }]
       );
 
-      //console.log(`\npre-parse response: ${r}  type: ${typeof r}\n`);
-
       console.log(
         `\npre-parse response: ${response}  type: ${typeof response}\n`
       );
@@ -214,9 +212,9 @@ Rules:
         console.log(
           "Received type of string and expected an Object.: " + response
         );
-        // vscode.window.showErrorMessage(
-        //   "Received type of string and expected an Object.: " + response
-        // );
+        vscode.window.showErrorMessage(
+          "Received type of string and expected an Object.: " + response
+        );
       } else if (
         typeof response !== "string" &&
         isValidJson(response.message.content)
@@ -246,7 +244,7 @@ Rules:
         console.log(`\nRetrying... Attempts left: ${retry}`);
       } else {
         console.log("\nError: Ai response: ", aiResponse);
-        aiResponse.code = "//Invalid code response after multiple attempts.";
+        aiResponse.code = "";
       }
     }
 
@@ -260,14 +258,6 @@ Rules:
       document.getText()
     );
     inlineCompletionProvider.setInlineSuggestion(uniqueAiResponse);
-    // completionProvider.addNewCompletionItem(
-    //   "Code suggestion:",
-    //   aiResponse.code
-    // );
-
-    // await vscode.commands.executeCommand("type", {
-    //   text: COMMANDS.aiResponseMenuTrigger,
-    // });
   } catch (e) {
     console.error(e);
   }
@@ -289,21 +279,21 @@ export async function promptForModel(context: vscode.ExtensionContext) {
   }
 }
 
-export async function promptForOllamaURL(context: vscode.ExtensionContext) {
-  const currentURL = context.globalState.get<string>(
-    "ollamaURL",
-    defaultURLChatCompletion
-  );
-  const ollamaUrl = await vscode.window.showInputBox({
-    prompt: "Enter the Ollama URL",
-    value: currentURL,
-  });
+// export async function promptForOllamaURL(context: vscode.ExtensionContext) {
+//   const currentURL = context.globalState.get<string>(
+//     "ollamaURL",
+//     defaultURLChatCompletion
+//   );
+//   const ollamaUrl = await vscode.window.showInputBox({
+//     prompt: "Enter the Ollama URL",
+//     value: currentURL,
+//   });
 
-  if (ollamaUrl) {
-    context.globalState.update("ollamaURL", ollamaUrl);
-    vscode.window.showInformationMessage(`Ollama URL set to: ${ollamaUrl}`);
-  }
-}
+//   if (ollamaUrl) {
+//     context.globalState.update("ollamaURL", ollamaUrl);
+//     vscode.window.showInformationMessage(`Ollama URL set to: ${ollamaUrl}`);
+//   }
+// }
 
 export async function promptForOllamaURLChat(context: vscode.ExtensionContext) {
   const currentURL = context.globalState.get<string>(
@@ -311,7 +301,7 @@ export async function promptForOllamaURLChat(context: vscode.ExtensionContext) {
     defaultURLChat
   );
   const ollamaUrl = await vscode.window.showInputBox({
-    prompt: "Enter the Ollama URL for the webview",
+    prompt: "Enter the Ollama URL",
     value: currentURL,
   });
 
@@ -364,22 +354,39 @@ export async function promptForOllamaHeaders(context: vscode.ExtensionContext) {
 }
 
 function removeDuplicateCode(aiResponse: string, documentText: string): string {
-  // Split both the AI response and document text into lines
   const aiLines = aiResponse.split("\n");
   const docLines = documentText.split("\n");
 
   // Function to normalize a line of code for comparison
   const normalizeLine = (line: string) => line.trim().replace(/\s+/g, " ");
 
-  // Create a Set of normalized document lines for faster lookup
-  const docLinesSet = new Set(docLines.map(normalizeLine));
+  // Function to get all substrings of a line
+  const getSubstrings = (line: string): string[] => {
+    const words = line.split(/\s+/);
+    return words.flatMap((_, i) =>
+      words.slice(i).map((_, j) => words.slice(i, i + j + 1).join(" "))
+    );
+  };
 
-  // Filter out duplicate lines from AI response
-  const uniqueAiLines = aiLines.filter((line) => {
+  // Create a Set of all substrings from document lines for faster lookup
+  const docSubstrings = new Set(
+    docLines.flatMap((line) => getSubstrings(normalizeLine(line)))
+  );
+
+  // Filter and clean AI response lines
+  const cleanedAiLines = aiLines.map((line) => {
     const normalizedLine = normalizeLine(line);
-    return !docLinesSet.has(normalizedLine) && normalizedLine !== "";
+    const substrings = getSubstrings(normalizedLine);
+
+    // Remove the longest matching substring from the line
+    const longestMatch =
+      substrings
+        .filter((substr) => docSubstrings.has(substr))
+        .sort((a, b) => b.length - a.length)[0] || "";
+
+    return normalizedLine.replace(longestMatch, "").trim();
   });
 
-  // Join the unique lines back into a string
-  return uniqueAiLines.join("\n");
+  // Remove empty lines and join the result
+  return cleanedAiLines.filter((line) => line !== "").join("\n");
 }

@@ -10,7 +10,6 @@ import {
   backgroundQueryForBoilerPlateCode,
   promptForModel,
   promptForOllamaHeaders,
-  promptForOllamaURL,
   promptForOllamaURLChat,
   queryAiOnUserQueryInTextDoc,
 } from "./scripts";
@@ -20,6 +19,8 @@ import InlineCompletionProvider from "./providers/inlineCompletionProvider";
 let lastCheckTime = 0;
 
 export async function activate(context: vscode.ExtensionContext) {
+  const webview = new WebViewProvider(context);
+
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "yourExtension.clearInlineSuggestion",
@@ -34,12 +35,16 @@ export async function activate(context: vscode.ExtensionContext) {
       promptForModel(context);
     })
   );
-
-  context.subscriptions.push(
-    vscode.commands.registerCommand("ollama-copilot.setURL", () => {
-      promptForOllamaURL(context);
-    })
-  );
+  //  package.json
+  // {
+  //         "command": "ollama-copilot.setURL",
+  //         "title": "Set Ollama URL"
+  //       },
+  // context.subscriptions.push(
+  //   vscode.commands.registerCommand("ollama-copilot.setURL", () => {
+  //     promptForOllamaURL(context);
+  //   })
+  // );
 
   context.subscriptions.push(
     vscode.commands.registerCommand("ollama-copilot.setOllamaHeaders", () => {
@@ -54,10 +59,7 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(
-      "ollamaView",
-      new WebViewProvider(context)
-    )
+    vscode.window.registerWebviewViewProvider("ollamaView", webview)
   );
 
   context.subscriptions.push(
@@ -66,6 +68,101 @@ export async function activate(context: vscode.ExtensionContext) {
       completionProvider,
       COMMANDS.aiResponseMenuTrigger
     )
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("ollama-copilot.clearWebviewChats", () => {
+      webview.clearWebviewChats();
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("ollama-copilot.getMoreInfo", () => {
+      //FIXME - update the webview with this prompt.
+      /* 
+      1. Check for selected text.
+      2. Prompt AI for more info about the text.
+      3. Push the response to the webview with the user message being more info about the selected text.
+      */
+
+      const editor = vscode.window.activeTextEditor;
+      if (editor) {
+        // Get the selected text
+        const selection = editor.selection;
+        const selectedText = editor.document.getText(selection);
+
+        if (selectedText) {
+          vscode.window.showInformationMessage(
+            `Selected text: ${selectedText}`
+          );
+          webview.promptAI(
+            "Tell me about the following code/text: " + selectedText
+          );
+        } else {
+          vscode.window.showInformationMessage("No text selected.");
+        }
+      } else {
+        vscode.window.showErrorMessage("No active editor found.");
+      }
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("ollama-copilot.improveTheCode", () => {
+      //FIXME - update the webview with this prompt.
+      /* 
+      1. Check for selected text.
+      2. Prompt AI for more info about the text.
+      3. Push the response to the webview with the user message being more info about the selected text.
+      */
+
+      const editor = vscode.window.activeTextEditor;
+      if (editor) {
+        // Get the selected text
+        const selection = editor.selection;
+        const selectedText = editor.document.getText(selection);
+
+        if (selectedText) {
+          vscode.window.showInformationMessage(
+            `Selected text: ${selectedText}`
+          );
+          webview.promptAI("Improve this code: " + selectedText);
+        } else {
+          vscode.window.showInformationMessage("No text selected.");
+        }
+      } else {
+        vscode.window.showErrorMessage("No active editor found.");
+      }
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("ollama-copilot.refactorCode", () => {
+      //FIXME - update the webview with this prompt.
+      /* 
+      1. Check for selected text.
+      2. Prompt AI for more info about the text.
+      3. Push the response to the webview with the user message being more info about the selected text.
+      */
+
+      const editor = vscode.window.activeTextEditor;
+      if (editor) {
+        // Get the selected text
+        const selection = editor.selection;
+        const selectedText = editor.document.getText(selection);
+
+        if (selectedText) {
+          vscode.window.showInformationMessage(
+            `Selected text: ${selectedText}`
+          );
+          webview.promptAI("Refactor this code: " + selectedText);
+        } else {
+          vscode.window.showInformationMessage("No text selected.");
+        }
+      } else {
+        vscode.window.showErrorMessage("No active editor found.");
+      }
+    })
   );
 
   const inlineCompletionProvider =
@@ -83,14 +180,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }
     const change = event.contentChanges[0];
 
-    let processedComments = new Set<number>();
-
     const model = context.globalState.get<string>("ollamaModel", llama3.name);
-
-    // const ollamaUrl = context.globalState.get<string>(
-    //   "ollamaURL",
-    //   defaultURLChatCompletion
-    // );
 
     const ollamaHeaders = context.globalState.get<string>(
       "ollamaHeaders",

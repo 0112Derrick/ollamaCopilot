@@ -15,20 +15,16 @@
   "main": "./dist/extension.js",
   "contributes": {
     "keybindings": [
-    {
-      "command": "yourExtension.clearInlineSuggestion",
-      "key": "escape",
-      "when": "inlineSuggestionVisible && editorTextFocus"
-    }
-  ],
+      {
+        "command": "yourExtension.clearInlineSuggestion",
+        "key": "escape",
+        "when": "inlineSuggestionVisible && editorTextFocus"
+      }
+    ],
     "commands": [
       {
         "command": "ollama-copilot.setModel",
         "title": "Set Ollama Model"
-      },
-      {
-        "command": "ollama-copilot.setURL",
-        "title": "Set Ollama URL"
       },
       {
         "command": "ollama-copilot.setOllamaHeaders",
@@ -36,9 +32,49 @@
       },
       {
         "command": "ollama-copilot.setURL_WebView",
-        "title": "Set Ollama webview url"
+        "title": "Set Ollama URL"
+      },
+      {
+        "command": "ollama-copilot.getMoreInfo",
+        "title": "Tell me more about this code."
+      },
+      {
+        "command": "ollama-copilot.improveTheCode",
+        "title": "Offer suggestion on how to improve this code."
+      },
+      {
+        "command": "ollama-copilot.refactorCode",
+        "title": "Refactor this code."
+      },
+      {
+        "command": "ollama-copilot.clearWebviewChats",
+        "title": "Clear Webview chats."
       }
     ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "ollama-copilot.getMoreInfo",
+          "when": "editorTextFocus",
+          "group": "3_execution"
+        },
+        {
+          "command": "ollama-copilot.clearWebviewChats",
+          "when": "editorTextFocus",
+          "group": "3_execution"
+        },
+        {
+          "command": "ollama-copilot.improveTheCode",
+          "when": "editorTextFocus",
+          "group": "3_execution"
+        },
+        {
+          "command": "ollama-copilot.refactorCode",
+          "when": "editorTextFocus",
+          "group": "3_execution"
+        }
+      ]
+    },
     "viewsContainers": {
       "activitybar": [
         {

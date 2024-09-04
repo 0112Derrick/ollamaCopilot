@@ -19,6 +19,7 @@ export type MessageRoles =
   | systemMessageRole;
 
 export class WebViewProvider implements vscode.WebviewViewProvider {
+  private _view?: vscode.WebviewView;
   private chatHistory: { role: MessageRoles; content: string }[] = [];
   private chatHistoryStorageKey = "ollama_copilot_chat_state";
   private SYSTEM_MESSAGE: string =
@@ -56,6 +57,35 @@ export class WebViewProvider implements vscode.WebviewViewProvider {
     this.chatHistory = chatHistory;
   }
 
+  promptAI(message: string) {
+    if (this._view) {
+      if (message.trim()) {
+        this._view.webview.postMessage({
+          command: "queryDocument",
+          query: message.trim(),
+        });
+        vscode.window.showInformationMessage("Check webview.");
+      } else {
+        vscode.window.showErrorMessage(
+          "An error occurred: No message received."
+        );
+      }
+    } else {
+      vscode.window.showErrorMessage("An error occurred: No webview detected.");
+    }
+  }
+
+  clearWebviewChats() {
+    this.context.workspaceState.update(this.chatHistoryStorageKey, null);
+    if (this._view) {
+      this._view.webview.postMessage({
+        command: "eraseAllChats",
+      });
+    }
+
+    vscode.window.showInformationMessage("Webview chats cleared.");
+  }
+
   resolveWebviewView(
     webviewView: vscode.WebviewView,
     context: vscode.WebviewViewResolveContext,
@@ -65,6 +95,7 @@ export class WebViewProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
       localResourceRoots: [this.context.extensionUri],
     };
+    this._view = webviewView;
 
     webviewView.webview.html = this.getWebviewContent(webviewView.webview);
 
@@ -175,6 +206,9 @@ export class WebViewProvider implements vscode.WebviewViewProvider {
             );
           }
           break;
+        case "deleteChatHistory":
+          this.context.workspaceState.update(this.chatHistoryStorageKey, null);
+          break;
         case "getChat":
           let chatHistoryData = this.context.workspaceState.get<string>(
             this.chatHistoryStorageKey,
@@ -199,19 +233,24 @@ export class WebViewProvider implements vscode.WebviewViewProvider {
           }
           break;
         case "requestImageUri":
-          const ollamaImg = webviewView.webview.asWebviewUri(
-            vscode.Uri.joinPath(
-              this.context.extensionUri,
-              "media",
-              "ollama-icon-01-blk_white.png"
-            )
-          );
+          try {
+            const ollamaImg = webviewView.webview.asWebviewUri(
+              vscode.Uri.joinPath(
+                this.context.extensionUri,
+                "media",
+                "ollama-icon-01-blk_white.png"
+              )
+            );
 
-          // Send the image URI back to the webview
-          webviewView.webview.postMessage({
-            command: "setImageUri",
-            imageUri: ollamaImg.toString(),
-          });
+            // Send the image URI back to the webview
+            webviewView.webview.postMessage({
+              command: "setImageUri",
+              imageUri: ollamaImg.toString(),
+            });
+          } catch (e) {
+            console.error(e);
+          }
+
           break;
         case "getLabelName":
           const labelResponse = await generateChatCompletion(

@@ -104,12 +104,12 @@ function reattachEventListeners() {
 
       let textToCopy = "";
       if (parentDiv.classList.contains("user-message")) {
-        const messageOptions = parentDiv.querySelector(".message-options");
-        if (!messageOptions) {
+        const userMessage = parentDiv.querySelector(".flex-nowrap");
+        if (!userMessage) {
           return;
         }
-        textToCopy = messageOptions.previousSibling?.textContent
-          ? messageOptions.previousSibling?.textContent
+        textToCopy = userMessage.children[1].textContent
+          ? userMessage.children[1].textContent
           : "";
       } else if (parentDiv.classList.contains("ai-message")) {
         const aiMessage = parentDiv.querySelector(".flex-nowrap");
@@ -456,15 +456,17 @@ async function main() {
   });
 
   userQuery.addEventListener("keypress", function (e) {
-    if (e.key === "Enter") {
-      if (userQuery.value.trim() !== "") {
+    if (e.key === "Enter" && !e.shiftKey) {
+      if (userQuery.value.trim() !== "" || documentsAppendedToQuery.length) {
         promptAI(userQuery.value);
       }
     }
   });
 
   sendButton.addEventListener("click", () => {
-    promptAI(userQuery.value);
+    if (userQuery.value.trim() !== "" || documentsAppendedToQuery.length) {
+      promptAI(userQuery.value);
+    }
   });
 
   function updateAppendedDocumentsUI() {
@@ -523,17 +525,38 @@ async function main() {
     queriesMade++;
     //userQuery.value;
     let query = message;
+    let visibleMessage = message;
     if (documentsAppendedToQuery.length) {
+      if (query.trim() === "") {
+        query += `${
+          documentsAppendedToQuery.length > 1
+            ? `Task:
+            Summarize the following documents as concisely as possible.
+            Wrap each summarization into a paragraph tag <p>Summary 1</p> <p>Summary 2</p> 
+            
+            Documents:`
+            : "Summarize the following document as concisely as possible: "
+        }  `;
+        visibleMessage = "Summarize the following documents: ";
+      }
       query += "\n";
-      documentsAppendedToQuery.forEach((doc) => {
+      visibleMessage += `<br></br> <div class="appendedDocs">Appended documents: `;
+      documentsAppendedToQuery.forEach((doc, indx) => {
+        query += `Document ${indx + 1} | File name: ${doc.fileName}`;
         query += doc.fileContent;
+        visibleMessage +=
+          indx === documentsAppendedToQuery.length - 1
+            ? doc.fileName + "."
+            : `${doc.fileName}, `;
+        query += "\n";
       });
+      visibleMessage += "</div>";
     }
     if (query.trim() === "") {
       return;
     }
 
-    displayMessage(query, "user");
+    displayMessage(visibleMessage, "user");
     console.log("Container ", conversationsContainer);
     console.log(typeof conversationsContainer);
     if (conversationsContainer && !conversationsContainer.has(selectedUUID)) {
@@ -552,6 +575,7 @@ async function main() {
     loadingIndicator.style.display = "inline";
 
     userQuery.value = "";
+    userQuery.style.height = "auto";
     clearDocumentsContainer();
   }
 
@@ -576,7 +600,13 @@ async function main() {
         `
       );
     } else {
-      messageElement.innerText = message;
+      messageElement.insertAdjacentHTML(
+        "afterbegin",
+        `<div class="flex-nowrap pt-4 itemsCenter">
+         <div class="userIcon">You</div>
+          <div class="userBackground">${message}</div>
+         </div>`
+      );
     }
 
     const messageOptions = document.createElement("div");
@@ -770,7 +800,6 @@ async function main() {
               conversationsContainer.set(selectedUUID, data);
             }
           }
-          //FIXME - I AM EMPTY!!!
 
           console.log(
             "Conversation container pre save: ",
@@ -817,7 +846,16 @@ async function main() {
             }
           }
           break;
-
+        case "queryDocument":
+          if (!message.query.trim()) {
+            return;
+          }
+          promptAI(message.query.trim());
+          break;
+        case "eraseAllChats":
+          handleCreateConversation();
+          recentChatsContainer.innerHTML = "";
+          break;
         default:
           console.error("Unknown command:", message.command);
           vscode.postMessage({
