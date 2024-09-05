@@ -170,15 +170,19 @@ body {
   border-radius: 4px;
 }
 
-.recentChats {
+.label {
   width: 100%;
   padding: 4px;
   border-radius: 4px;
   background-color: inherit;
   cursor: pointer;
+  display: flex;
+  gap: 4px;
+  justify-content: space-around;
+  align-items: center;
 }
 
-.recentChats:hover {
+.label:hover {
   background-color: var(--gray-700);
 }
 
@@ -385,6 +389,8 @@ body {
 
 .suggestionsContainer {
   margin: 40px 0;
+  align-items: center;
+  justify-content: center;
 }
 
 .promptSuggestions {
@@ -535,4 +541,47 @@ body {
 
 .tooltip:hover .tooltiptext {
   visibility: visible;
+}
+
+/* Styling for the tooltip container */
+.labelOptions {
+  position: relative; /* Position relative to use absolute positioning for the menu */
+  cursor: pointer; /* Show a pointer cursor on hover */
+}
+
+/* Hide the menu initially */
+.menu {
+  display: none; /* Hidden by default */
+  position: absolute;
+  bottom: -50px; /* Position below the label */
+  right: 2px; /* Align to the right */
+  background-color: #fff; /* Background color for the menu */
+  border: 1px solid #ddd; /* Border around the menu */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Shadow for a 3D effect */
+  padding: 10px;
+  z-index: 1000; /* Ensure the menu is above other content */
+  border-radius: 4px;
+}
+
+/* Display the menu when the labelOption is active */
+.labelOptions.active .menu {
+  display: block; /* Show the menu */
+}
+
+/* Styling for menu buttons */
+.menu button {
+  display: block;
+  width: 100%;
+  padding: 5px;
+  border: none;
+  background: inherit;
+  border-radius: 4px;
+  margin: 2px 0;
+  cursor: pointer;
+}
+
+.menu button:hover {
+  background: var(--gray-200);
+  color: var(--red-500);
+  fill: var(--red-500);
 }

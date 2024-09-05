@@ -87,6 +87,9 @@ const addEventListenerToClass = (
   });
 };
 
+/*  
+Re-add code container copy button
+*/
 function reattachEventListeners() {
   const copyButtons: NodeListOf<HTMLElement> = document.querySelectorAll(
     ".clipboard-icon-messages"
@@ -154,6 +157,10 @@ type ChatContainer = Map<
     queriesMade: number;
   }
 >;
+
+const deleteIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0"> <path fill-rule="evenodd" clip-rule="evenodd" d="M10.5555 4C10.099 4 9.70052 4.30906 9.58693 4.75114L9.29382 5.8919H14.715L14.4219 4.75114C14.3083 4.30906 13.9098 4 13.4533 4H10.5555ZM16.7799 5.8919L16.3589 4.25342C16.0182 2.92719 14.8226 2 13.4533 2H10.5555C9.18616 2 7.99062 2.92719 7.64985 4.25342L7.22886 5.8919H4C3.44772 5.8919 3 6.33961 3 6.8919C3 7.44418 3.44772 7.8919 4 7.8919H4.10069L5.31544 19.3172C5.47763 20.8427 6.76455 22 8.29863 22H15.7014C17.2354 22 18.5224 20.8427 18.6846 19.3172L19.8993 7.8919H20C20.5523 7.8919 21 7.44418 21 6.8919C21 6.33961 20.5523 5.8919 20 5.8919H16.7799ZM17.888 7.8919H6.11196L7.30423 19.1057C7.3583 19.6142 7.78727 20 8.29863 20H15.7014C16.2127 20 16.6417 19.6142 16.6958 19.1057L17.888 7.8919ZM10 10C10.5523 10 11 10.4477 11 11V16C11 16.5523 10.5523 17 10 17C9.44772 17 9 16.5523 9 16V11C9 10.4477 9.44772 10 10 10ZM14 10C14.5523 10 15 10.4477 15 11V16C15 16.5523 14.5523 17 14 17C13.4477 17 13 16.5523 13 16V11C13 10.4477 13.4477 10 14 10Z" fill="currentColor"></path></svg>`;
+
+const ellipsesSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-md"><path fill-rule="evenodd" clip-rule="evenodd" d="M3 12C3 10.8954 3.89543 10 5 10C6.10457 10 7 10.8954 7 12C7 13.1046 6.10457 14 5 14C3.89543 14 3 13.1046 3 12ZM10 12C10 10.8954 10.8954 10 12 10C13.1046 10 14 10.8954 14 12C14 13.1046 13.1046 14 12 14C10.8954 14 10 13.1046 10 12ZM17 12C17 10.8954 17.8954 10 19 10C20.1046 10 21 10.8954 21 12C21 13.1046 20.1046 14 19 14C17.8954 14 17 13.1046 17 12Z" fill="currentColor"></path><span class="tooltiptext">Options</span></svg>`;
 
 const requestData = () => {
   vscode.postMessage({
@@ -263,6 +270,7 @@ async function main() {
     addEventListenerToClass(".promptSuggestions", "click", (e: MouseEvent) => {
       promptAI((e.target as HTMLDivElement).innerHTML);
     });
+
     vscode.postMessage({
       command: "clearChatHistory",
     });
@@ -302,6 +310,60 @@ async function main() {
     sendButton.removeEventListener("mouseleave", handleMouseLeave);
   };
 
+  const createChatLabel = (id: string, _labelName?: string) => {
+    let uuid = id;
+    const chatLabel = document.createElement("div");
+    chatLabel.className = "label";
+    chatLabel.addEventListener("click", () => {
+      handleRecentChatClicked(uuid);
+    });
+
+    //FIXME - Add Rename option.
+    const labelName = document.createElement("div");
+    labelName.innerText = _labelName || uuid;
+    labelName.className = "labelName";
+    chatLabel.appendChild(labelName);
+
+    const labelOption = document.createElement("div");
+    labelOption.className = "labelOptions";
+    labelOption.insertAdjacentHTML(
+      "afterbegin",
+      `
+          <div class="labelOption tooltip">
+          ${ellipsesSvg}
+          </div>
+          `
+    );
+    labelOption.addEventListener("click", (event) => {
+      if (labelOption.classList.contains("active")) {
+        labelOption.classList.remove("active");
+      } else {
+        // Prevent the event from bubbling up to other elements
+        event.stopPropagation();
+
+        // Toggle the menu visibility
+        labelOption.classList.toggle("active");
+      }
+    });
+
+    const menu = document.createElement("div");
+    menu.className = "menu";
+
+    const deleteButton = document.createElement("button");
+    deleteButton.addEventListener("click", () => {
+      conversationsContainer.delete(uuid);
+      recentChatsContainer.removeChild(chatLabel);
+      handleCreateConversation();
+      console.log("Deleted " + uuid);
+      //FIXME - add save
+    });
+    deleteButton.innerHTML = `<div class="flex-nowrap justifyCenter itemsCenter">${deleteIcon} Delete</div>`;
+    menu.appendChild(deleteButton);
+    labelOption.appendChild(menu);
+    chatLabel.appendChild(labelOption);
+    return chatLabel;
+  };
+
   const updateConversationContainer = () => {
     if (!conversation || !recentChatsContainer || !conversationsContainer) {
       return;
@@ -310,17 +372,8 @@ async function main() {
     if (selectedUUID) {
       if (!conversationsContainer.has(selectedUUID)) {
         console.log("Creating a new conversation log: " + selectedUUID);
-        const newRecentChat = document.createElement("div");
-        newRecentChat.className = "recentChats";
-        newRecentChat.addEventListener(
-          "click",
-          ((uuid) => () => {
-            handleRecentChatClicked(uuid);
-          })(selectedUUID)
-        );
-        newRecentChat.innerText = selectedUUID;
-
-        recentChatsContainer.appendChild(newRecentChat);
+        const chatLabel = createChatLabel(selectedUUID);
+        recentChatsContainer.appendChild(chatLabel);
         conversationsContainer.set(selectedUUID, {
           conversationHtml: conversation.innerHTML,
           lastUpdatedTime: Date.now(),
@@ -379,18 +432,11 @@ async function main() {
         uuid = val.lastUpdatedTime;
         selectedUUID = key;
       }
-      recentChatsContainer.insertAdjacentHTML(
-        "beforeend",
-        `<div class="recentChats">${val.label ? val.label : key}</div>`
-      );
+
+      const chatLabel = createChatLabel(key, val.label ? val.label : key);
+      recentChatsContainer.appendChild(chatLabel);
     }
-    document.querySelectorAll(".recentChats").forEach((div, index) => {
-      const correspondingKey = Array.from(conversationsContainer.keys())[index];
-      console.log(correspondingKey);
-      div.addEventListener("click", () =>
-        handleRecentChatClicked(correspondingKey)
-      );
-    });
+
     console.log("Setting to previous conversation: " + selectedUUID);
     const selectedConversation = conversationsContainer.get(selectedUUID);
     if (selectedConversation) {
@@ -832,13 +878,18 @@ async function main() {
                 });
               }
               if (recentChatsContainer) {
-                // Find the child element with innerText matching message.id
+                // Iterate over each child of recentChatsContainer
                 const children = recentChatsContainer.children;
                 for (let i = 0; i < children.length; i++) {
                   const child = children[i] as HTMLElement;
-                  if (child.innerText === message.id) {
-                    // Update the innerText of the matching child element
-                    child.innerText = message.label;
+
+                  // Find the div with class 'labelName' within each child
+                  const labelNameDiv = child.querySelector(
+                    ".labelName"
+                  ) as HTMLElement;
+                  if (labelNameDiv && labelNameDiv.innerText === message.id) {
+                    // Update the innerText of the labelName div
+                    labelNameDiv.innerText = message.label;
                     break; // Exit the loop once the item is found and updated
                   }
                 }
@@ -875,7 +926,7 @@ async function main() {
     if (!sidePanel || !container) {
       return;
     }
-    sidePanel.style.width = "150px"; // Set the width of the side panel
+    sidePanel.style.width = "175px"; // Set the width of the side panel
     sidePanel.style.paddingLeft = "20px";
     container.classList.add("with-panel"); // Move content to the right
   }

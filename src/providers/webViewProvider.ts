@@ -76,7 +76,7 @@ export class WebViewProvider implements vscode.WebviewViewProvider {
   }
 
   clearWebviewChats() {
-    this.context.workspaceState.update(this.chatHistoryStorageKey, null);
+    this.context.workspaceState.update(this.chatHistoryStorageKey, undefined);
     if (this._view) {
       this._view.webview.postMessage({
         command: "eraseAllChats",

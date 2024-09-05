@@ -310,8 +310,9 @@ export async function activate(context: vscode.ExtensionContext) {
           change.text === " " ||
           change.text.endsWith(";") || // Optional: check for semicolon
           change.text.endsWith("{") || // Optional: check for opening brace
-          change.text.endsWith("}")
-        ); // Optional: check for closing brace;
+          change.text.endsWith("}") || // Optional: check for closing brace;
+          change.text.endsWith("=") // Optional: check for equal sign;
+        );
       })
     ) {
       checkAndInsertSuggestion();
