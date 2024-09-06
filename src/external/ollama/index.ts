@@ -47,9 +47,14 @@ export async function generateCompletion(
   }
 }
 
+type choices = {
+  message: { role: MessageRoles; content: string };
+  finish_reason: string;
+  index: number;
+  logprobs: any;
+}[];
 //Chat with an AI model
 export async function generateChatCompletion(
-  systemPrompt: string,
   model: string = llama3.name,
   url: string = defaultURLChat,
   headers: { [key: string]: string } = {},
@@ -59,6 +64,7 @@ export async function generateChatCompletion(
   | {
       model: string;
       created_at: string;
+      choices: choices;
       message: { role: string; content: string };
       done_reason: string;
       done: boolean;
@@ -80,8 +86,6 @@ export async function generateChatCompletion(
       model: model,
       messages: chatHistory,
       stream: stream,
-      options: { repeat_penalty: 1.2 },
-      system: systemPrompt,
     };
 
     console.log(
