@@ -16,8 +16,6 @@ import {
 import { COMMANDS } from "./utils";
 import InlineCompletionProvider from "./providers/inlineCompletionProvider";
 
-let lastCheckTime = 0;
-
 export async function activate(context: vscode.ExtensionContext) {
   const webview = new WebViewProvider(context);
 
@@ -33,26 +31,10 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand("ollama-copilot.setModel", () => {
       promptForModel(context);
-    })
-  );
-  //  package.json
-  // {
-  //         "command": "ollama-copilot.setURL",
-  //         "title": "Set Ollama URL"
-  //       },
-  // context.subscriptions.push(
-  //   vscode.commands.registerCommand("ollama-copilot.setURL", () => {
-  //     promptForOllamaURL(context);
-  //   })
-  // );
-
-  context.subscriptions.push(
+    }),
     vscode.commands.registerCommand("ollama-copilot.setOllamaHeaders", () => {
       promptForOllamaHeaders(context);
-    })
-  );
-
-  context.subscriptions.push(
+    }),
     vscode.commands.registerCommand("ollama-copilot.setURL_WebView", () => {
       promptForOllamaURLChat(context);
     })
@@ -182,6 +164,11 @@ export async function activate(context: vscode.ExtensionContext) {
 
     const model = context.globalState.get<string>("ollamaModel", llama3.name);
 
+    const isOpenAiModel = context.globalState.get<boolean>(
+      "openAiModel",
+      false
+    );
+
     const ollamaHeaders = context.globalState.get<string>(
       "ollamaHeaders",
       "{}"
@@ -208,11 +195,11 @@ export async function activate(context: vscode.ExtensionContext) {
         if (!lineText.includes(COMMANDS.aiTrigger)) {
           //ANCHOR - Check for boiler plate code.
           backgroundQueryForBoilerPlateCode(
-            lastCheckTime,
             model,
             ollamaUrlChat,
             ollamaHeaders,
-            document
+            document,
+            isOpenAiModel
           );
         }
       } catch (e) {

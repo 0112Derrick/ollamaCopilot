@@ -81,12 +81,12 @@ export const queryAiOnUserQueryInTextDoc = async (
 
   while (retry > 0) {
     response = await generateChatCompletion(
-      systemPrompt,
       model,
       ollamaUrl,
       JSON.parse(ollamaHeaders),
       false,
       [
+        { role: "system", content: systemPrompt },
         { role: "system", content: currentDocTextPrompt },
         { role: "user", content: query },
       ]
@@ -135,12 +135,13 @@ export const queryAiOnUserQueryInTextDoc = async (
   });
 };
 
+let lastCheckTime = 0;
 export const backgroundQueryForBoilerPlateCode = async (
-  lastCheckTime: number,
   model: string,
   ollamaUrl: string,
   ollamaHeaders: string,
-  document: vscode.TextDocument
+  document: vscode.TextDocument,
+  isOpenAiModel: boolean
 ) => {
   console.log("\nChecking doc for boiler plate code.\n");
   const currentTime = Date.now();
@@ -151,8 +152,8 @@ export const backgroundQueryForBoilerPlateCode = async (
     }`
   );
 
-  // Throttle the AI check to every 25 seconds
-  if (currentTime - lastCheckTime < 25000) {
+  // Throttle the AI check to every 5 seconds
+  if (currentTime - lastCheckTime < 5 * 1000) {
     return;
   }
 
@@ -201,45 +202,53 @@ Rules:
   try {
     while (retry > 0) {
       let response = await generateChatCompletion(
-        systemPrompt,
         model,
         ollamaUrl,
         JSON.parse(ollamaHeaders),
         false,
-        [{ role: "user", content: query }]
+        [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: query },
+        ]
       );
 
-      console.log(
-        `\npre-parse response: ${response}  type: ${typeof response}\n`
-      );
+      // console.log(
+      //   `\npre-parse response: ${response}  type: ${typeof response}\n`
+      // );
 
-      if (typeof response === "string" && response.trim() !== "") {
+      if (
+        (typeof response === "string" && response.trim() !== "") ||
+        typeof response === "string"
+      ) {
         console.log(
           "Received type of string and expected an Object.: " + response
         );
         vscode.window.showErrorMessage(
           "Received type of string and expected an Object.: " + response
         );
-      } else if (
-        typeof response !== "string" &&
-        isValidJson(response.message.content)
-      ) {
-        // Validate if the response is a valid JSON
-        aiResponse = JSON.parse(response.message.content);
+      }
 
-        console.log(
-          `\npost-parse response: ${response} type: ${typeof response}\n obj: ${JSON.stringify(
-            response
-          )}`
-        );
+      if (typeof response !== "string") {
+        let msg =
+          response.choices.at(-1)?.message.content || response.message.content;
+        if (isValidJson(msg)) {
+          // Validate if the response is a valid JSON
+          aiResponse = JSON.parse(msg);
+          console.log(
+            `\npost-parse response: ${response}  type: ${typeof response}\n obj: ${JSON.stringify(
+              response
+            )}`
+          );
 
-        if (
-          aiResponse.isBoilerPlateCode !== undefined &&
-          Object.hasOwn(aiResponse, "code")
-        ) {
-          // console.log("boiler plate: ", aiResponse.isBoilerPlateCode);
-          console.log("code: ", aiResponse.code);
-          break;
+          if (
+            Object.hasOwn(aiResponse, "isBoilerPlateCode") &&
+            aiResponse.isBoilerPlateCode !== undefined &&
+            Object.hasOwn(aiResponse, "code")
+          ) {
+            console.log("boiler plate: ", aiResponse.isBoilerPlateCode);
+            console.log("code: ", aiResponse.code);
+            break;
+          }
         }
       }
 
@@ -272,14 +281,39 @@ export async function promptForModel(context: vscode.ExtensionContext) {
     "ollamaModel",
     llama3.name
   );
+
+  let isOpenAiModel = context.globalState.get<boolean>("openAiModel", false);
+
   const model = await vscode.window.showInputBox({
     prompt: "Enter the Ollama model name",
     value: currentModel,
   });
 
+  let val = `${isOpenAiModel}`;
+
+  const _isOpenAiModel = await vscode.window.showInputBox({
+    prompt: "Is this an openAiModel?",
+    value: val,
+  });
+  console.log(isOpenAiModel);
+
+  if (_isOpenAiModel) {
+    if (
+      _isOpenAiModel.toLowerCase() === "true" ||
+      _isOpenAiModel.toLowerCase() === "t"
+    ) {
+      isOpenAiModel = true;
+    } else {
+      isOpenAiModel = false;
+    }
+  }
+
   if (model) {
     context.globalState.update("ollamaModel", model);
-    vscode.window.showInformationMessage(`Ollama model set to: ${model}`);
+    context.globalState.update("openAiModel", isOpenAiModel);
+    vscode.window.showInformationMessage(
+      `Ollama model set to: ${model}. Is openAi model: ${isOpenAiModel}`
+    );
   }
 }
 
