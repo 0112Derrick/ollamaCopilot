@@ -233,10 +233,10 @@ export class WebViewProvider implements vscode.WebviewViewProvider {
             ""
           );
           if (chatHistoryData && isValidJson(chatHistoryData)) {
-            console.log(
-              "Chat history state sent to webview: ",
-              chatHistoryData
-            );
+            // console.log(
+            //   "Chat history state sent to webview: ",
+            //   chatHistoryData
+            // );
             webviewView.webview.postMessage({
               command: "setChatHistory",
               data: chatHistoryData,

@@ -1,17 +1,12 @@
 import * as vscode from "vscode";
-import {
-  llama3,
-  defaultURLChatCompletion,
-  defaultURLChat,
-} from "./external/ollama";
+import { llama3, defaultURLChat } from "./external/ollama";
 import { WebViewProvider } from "./providers/webViewProvider";
 import completionProvider from "./providers/completionProvider";
 import {
-  backgroundQueryForBoilerPlateCode,
+  inlineSuggestionProvider,
   promptForModel,
   promptForOllamaHeaders,
   promptForOllamaURLChat,
-  queryAiOnUserQueryInTextDoc,
 } from "./scripts";
 import { COMMANDS } from "./utils";
 import InlineCompletionProvider from "./providers/inlineCompletionProvider";
@@ -60,7 +55,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand("ollama-copilot.getMoreInfo", () => {
-      //FIXME - update the webview with this prompt.
       /* 
       1. Check for selected text.
       2. Prompt AI for more info about the text.
@@ -91,7 +85,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand("ollama-copilot.improveTheCode", () => {
-      //FIXME - update the webview with this prompt.
       /* 
       1. Check for selected text.
       2. Prompt AI for more info about the text.
@@ -120,7 +113,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand("ollama-copilot.refactorCode", () => {
-      //FIXME - update the webview with this prompt.
       /* 
       1. Check for selected text.
       2. Prompt AI for more info about the text.
@@ -149,7 +141,25 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const inlineCompletionProvider =
     vscode.languages.registerInlineCompletionItemProvider(
-      { pattern: "**" }, // Applies to all files, adjust the pattern if needed
+      [
+        { language: "javascript" },
+        { language: "typescript" },
+        { language: "python" },
+        { language: "java" },
+        { language: "c" },
+        { language: "cpp" },
+        { language: "csharp" },
+        { language: "go" },
+        { language: "ruby" },
+        { language: "php" },
+        { language: "swift" },
+        { language: "kotlin" },
+        { language: "rust" },
+        { language: "html" },
+        { language: "javascriptreact" },
+        { language: "typescriptreact" },
+      ],
+      /*  { pattern: "**" }, // Applies to all files, adjust the pattern if needed */
       InlineCompletionProvider // Create an instance of the provider class
     );
 
@@ -164,10 +174,10 @@ export async function activate(context: vscode.ExtensionContext) {
 
     const model = context.globalState.get<string>("ollamaModel", llama3.name);
 
-    const isOpenAiModel = context.globalState.get<boolean>(
-      "openAiModel",
-      false
-    );
+    // const isOpenAiModel = context.globalState.get<boolean>(
+    //   "openAiModel",
+    //   false
+    // );
 
     const ollamaHeaders = context.globalState.get<string>(
       "ollamaHeaders",
@@ -184,99 +194,30 @@ export async function activate(context: vscode.ExtensionContext) {
       try {
         const document = editor.document;
         const position = editor.selection.active;
-        const lineCount = document.lineCount;
 
         const line = document.lineAt(position.line);
         const lineText = line.text.trim();
         const languageId = document.languageId;
 
-        const systemPrompt = `Return in string format code that responds to the user query. You will only ever return code and nothing else. Do not respond with any other statements other than the code or code comments. If you do make comments make sure to wrap the comment in block comments e.g: /* comment */. Ensure your answer is correct and only return the best version of your answer. Ensure that you match how the user codes (variables, functions vs objects, loops).`;
-
         if (!lineText.includes(COMMANDS.aiTrigger)) {
-          //ANCHOR - Check for boiler plate code.
-          backgroundQueryForBoilerPlateCode(
+          if (inlineSuggestionProvider.getCodingLanguage() !== languageId) {
+            inlineSuggestionProvider.setCodingLanguage(languageId);
+          }
+
+          //ANCHOR - Check code for autocompletion areas.
+          inlineSuggestionProvider.triggerQueryAI(
             model,
             ollamaUrlChat,
             ollamaHeaders,
             document,
-            isOpenAiModel
+            lineText ? lineText : undefined,
+            lineText ? position.line : undefined
           );
         }
       } catch (e) {
         console.error("error: ", e);
       }
     };
-
-    //     if (
-    //       (lineText.startsWith(COMMANDS.aiTrigger) || lineText === "") &&
-    //       !processedComments.has(position.line)
-    //     ) {
-    //       if (position.line < 0 || position.line >= document.lineCount) {
-    //         console.error(`Invalid line number: ${position.line}`);
-    //         vscode.window.showErrorMessage(
-    //           `An error occurred: Invalid line number: ${position.line}`
-    //         );
-    //         return;
-    //       }
-
-    //       processedComments.add(position.line);
-    //       const newPosition = editor.selection.active;
-
-    //       if (newPosition.line < 0 || newPosition.line >= document.lineCount) {
-    //         console.error(`Invalid new position line: ${newPosition.line}`);
-    //         vscode.window.showErrorMessage(
-    //           `An error occurred: Invalid new position line: ${newPosition.line}`
-    //         );
-    //         return;
-    //       }
-
-    //       const newLine = document.lineAt(newPosition.line);
-    //       const newLineText = newLine.text.trim();
-
-    //       if (
-    //         newLineText.startsWith(COMMANDS.aiTrigger) &&
-    //         !newLineText.includes(COMMANDS.clearSuggestionsCommand) &&
-    //         !newLineText.includes(COMMANDS.restoreSuggestions)
-    //       ) {
-    //         queryAiOnUserQueryInTextDoc(
-    //           newLine,
-    //           newLineText,
-    //           systemPrompt,
-    //           editor,
-    //           document,
-    //           model,
-    //           ollamaUrlChat,
-    //           ollamaHeaders,
-    //           `${languageId === "text" ? "typescript" : languageId}.`
-    //         );
-    //       } else if (newLineText === COMMANDS.clearSuggestionsCommand) {
-    //         //ANCHOR - Clear suggestions
-    //         completionProvider.clearSuggestions();
-    //       } else if (newLineText === COMMANDS.restoreSuggestions) {
-    //         //ANCHOR - Restore suggestions
-    //         completionProvider.restoreSuggestions();
-    //       } else {
-    //         //ANCHOR - Check for boiler plate code.
-    //         backgroundQueryForBoilerPlateCode(
-    //           lastCheckTime,
-    //           model,
-    //           ollamaUrlChat,
-    //           ollamaHeaders,
-    //           document
-    //         );
-
-    //         /* if (
-    //         newLineText === "" &&
-    //         position.line >= lineCount - 2 &&
-    //         document.getText().trim() !== ""
-    //       )  */
-    //       }
-    //     }
-    //   } catch (e) {
-    //     console.error("Error: ", e);
-    //     vscode.window.showErrorMessage("An error occurred: " + e);
-    //   }
-    // };
 
     if (change) {
       // Check if the suggestion was accepted
@@ -293,7 +234,10 @@ export async function activate(context: vscode.ExtensionContext) {
     if (
       event.contentChanges.some((change) => {
         return (
-          change.text.includes("\n") ||
+          change.text.startsWith("//") ||
+          change.text.startsWith("class") ||
+          change.text.endsWith("[") ||
+          change.text.endsWith("]") ||
           change.text === " " ||
           change.text.endsWith(";") || // Optional: check for semicolon
           change.text.endsWith("{") || // Optional: check for opening brace
