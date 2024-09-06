@@ -241,11 +241,9 @@ Rules:
           );
 
           if (
-            Object.hasOwn(aiResponse, "isBoilerPlateCode") &&
             aiResponse.isBoilerPlateCode !== undefined &&
             Object.hasOwn(aiResponse, "code")
           ) {
-            console.log("boiler plate: ", aiResponse.isBoilerPlateCode);
             console.log("code: ", aiResponse.code);
             break;
           }
