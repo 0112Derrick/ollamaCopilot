@@ -88,11 +88,11 @@ export async function generateChatCompletion(
       stream: stream,
     };
 
-    console.log(
-      `url: ${url} |data: ${JSON.stringify(data_)} | config: ${JSON.stringify(
-        config
-      )}`
-    );
+    // console.log(
+    //   `url: ${url} |data: ${JSON.stringify(data_)} | config: ${JSON.stringify(
+    //     config
+    //   )}`
+    // );
     const response = await axios.post(url, data_, config);
 
     if (typeof response.data === "string" && isValidJson(response.data)) {

@@ -7,8 +7,8 @@ class InlineCompletionProvider implements vscode.InlineCompletionItemProvider {
 
   setInlineSuggestion(text: string) {
     this.inlineSuggestion = text;
-    this.chunks = this.splitIntoChunks(text);
     this.currentChunkPos = 0;
+    this.chunks = this.splitIntoChunks(text);
   }
 
   clearInlineSuggestion() {
@@ -23,10 +23,10 @@ class InlineCompletionProvider implements vscode.InlineCompletionItemProvider {
     const chunks: string[] = [];
     let currentChunk: string[] = [];
 
-    lines.forEach((line) => {
+    lines.forEach((line, index) => {
       // Add line to the current chunk
       currentChunk.push(line);
-
+      console.log(`Chunk ${index} set to: ${line}`);
       // Check for logical breakpoints
       if (
         line.trim().endsWith("{") || // Start of a block (class, function, if, loop)
@@ -84,10 +84,53 @@ class InlineCompletionProvider implements vscode.InlineCompletionItemProvider {
     }
 
     if (this.chunks.length > 0 && this.currentChunkPos < this.chunks.length) {
+      const currentLine = document.lineAt(position.line);
+      const lineText = currentLine.text;
+      const cursorPosition = position.character;
+
+      // Determine the insertion position
+      let insertPosition = position;
+      let rangeToReplace = new vscode.Range(position, position);
+
+      if (lineText.trim() !== "") {
+        // There's text on the line
+        const openBracketIndex = lineText.lastIndexOf("(", cursorPosition);
+        const openCurlyBraceIndex = lineText.lastIndexOf("{", cursorPosition);
+        const closeBracketIndex = lineText.indexOf(")", cursorPosition);
+        const closeCurlyBraceIndex = lineText.indexOf("}", cursorPosition);
+        const openSquareBracketIndex = lineText.lastIndexOf(
+          "[",
+          cursorPosition
+        );
+        const closeSquareBracketIndex = lineText.indexOf("]", cursorPosition);
+
+        if (
+          (openBracketIndex !== -1 &&
+            closeBracketIndex !== -1 &&
+            openBracketIndex < cursorPosition &&
+            cursorPosition < closeBracketIndex) ||
+          (openCurlyBraceIndex !== -1 &&
+            closeCurlyBraceIndex !== -1 &&
+            openCurlyBraceIndex < cursorPosition &&
+            cursorPosition < closeCurlyBraceIndex) ||
+          (openSquareBracketIndex !== -1 &&
+            closeSquareBracketIndex !== -1 &&
+            openSquareBracketIndex < cursorPosition &&
+            cursorPosition < closeBracketIndex)
+        ) {
+          // Cursor is inside brackets or braces
+          insertPosition = position;
+        } else {
+          // Insert at the end of the line
+          insertPosition = currentLine.range.end;
+          rangeToReplace = new vscode.Range(insertPosition, insertPosition);
+        }
+      }
+
       return [
         {
           insertText: this.chunks[this.currentChunkPos],
-          range: new vscode.Range(position, position),
+          range: rangeToReplace,
         },
       ];
     } else {
