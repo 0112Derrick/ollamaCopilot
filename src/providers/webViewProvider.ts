@@ -99,50 +99,68 @@ export class WebViewProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.html = this.getWebviewContent(webviewView.webview);
 
+    const isOpenAiModel = this.context.globalState.get<boolean>(
+      "openAiModel",
+      false
+    );
+
     webviewView.webview.onDidReceiveMessage(async (message) => {
       switch (message.command) {
         case "promptAI":
-          this.chatHistory.push({
-            role: "user",
-            content: `${message.query}`,
-          });
+          try {
+            this.chatHistory.push({
+              role: "system",
+              content: this.SYSTEM_MESSAGE,
+            });
 
-          const response = await generateChatCompletion(
-            this.SYSTEM_MESSAGE,
-            this.context.globalState.get<string>("ollamaModel", llama3.name),
-            this.context.globalState.get<string>(
-              "ollamaURLChat",
-              defaultURLChat
-            ),
-            JSON.parse(
-              this.context.globalState.get<string>("ollamaHeaders", "{}")
-            ),
-            false,
-            this.chatHistory
-          );
-          let data = response;
-          if (typeof response === "string") {
-            data = response;
-          } else {
-            if (isValidJson(response.message.content)) {
-              // console.log(JSON.stringify(response));
-              data = JSON.parse(response.message.content);
+            this.chatHistory.push({
+              role: "user",
+              content: `${message.query}`,
+            });
+            const response = await generateChatCompletion(
+              this.context.globalState.get<string>("ollamaModel", llama3.name),
+              this.context.globalState.get<string>(
+                "ollamaURLChat",
+                defaultURLChat
+              ),
+              JSON.parse(
+                this.context.globalState.get<string>("ollamaHeaders", "{}")
+              ),
+              false,
+              this.chatHistory
+            );
+            let data = response;
+            if (typeof response === "string") {
+              data = response;
             } else {
-              data = response.message.content;
+              let msg =
+                response.choices.at(-1)?.message.content ||
+                response.message.content;
+              if (msg) {
+                if (isValidJson(msg)) {
+                  data = JSON.parse(msg);
+                } else {
+                  data = msg;
+                }
+              }
             }
+
+            this.chatHistory.push({ role: "assistant", content: `${data}` });
+
+            webviewView.webview.postMessage({
+              command: "displayResponse",
+              response: data,
+            });
+
+            webviewView.webview.postMessage({
+              command: "updateChatHistory",
+              chatHistory: this.chatHistory,
+            });
+          } catch (e) {
+            console.log("An error occurred: " + e);
+            vscode.window.showErrorMessage("An error occurred: " + e);
           }
 
-          this.chatHistory.push({ role: "assistant", content: `${data}` });
-
-          webviewView.webview.postMessage({
-            command: "displayResponse",
-            response: data,
-          });
-
-          webviewView.webview.postMessage({
-            command: "updateChatHistory",
-            chatHistory: this.chatHistory,
-          });
           break;
         case "logError":
           vscode.window.showErrorMessage("An error occurred: " + message.text);
@@ -254,7 +272,6 @@ export class WebViewProvider implements vscode.WebviewViewProvider {
           break;
         case "getLabelName":
           const labelResponse = await generateChatCompletion(
-            "",
             this.context.globalState.get<string>("ollamaModel", llama3.name),
             this.context.globalState.get<string>(
               "ollamaURLChat",
@@ -286,11 +303,21 @@ export class WebViewProvider implements vscode.WebviewViewProvider {
 
           if (typeof labelResponse !== "string") {
             let labelName = message.id;
-            console.log("label: " + labelResponse.message.content);
-            if (isValidJson(labelResponse.message.content)) {
-              let obj: { label: string } = JSON.parse(
-                labelResponse.message.content
-              );
+            console.log("Label response: " + JSON.stringify(labelResponse));
+            let data = "";
+
+            if (isOpenAiModel) {
+              let label =
+                labelResponse.choices.at(-1)?.message.content ||
+                labelResponse.message.content;
+              console.log(label);
+              if (label) {
+                console.log("label: " + label);
+                data = label;
+              }
+            }
+            if (isValidJson(data)) {
+              let obj: { label: string } = JSON.parse(data);
               if (obj.hasOwnProperty("label")) {
                 labelName = obj.label;
               }
