@@ -174,12 +174,17 @@ ${document.getText()}
 Task:
 1. Determine if this is boilerplate code or user code that needs autocompletion.
 2. If it's boilerplate code, complete it fully.
-3. Think through the problem carefully and solve for both things that the developer is currently solving and potentially unaware they need to solve as well.
-4. If it's user code, attempt to autocomplete the next logical part.
+3. If it's user code, attempt to autocomplete the next logical part.
+  a. Briefly analyze the problem you and the user are trying to solve and outline your approach to solving it.
+  b. Present a clear plan of steps to solve the problem.
+  c. Use a "Chain of Thought" reasoning process if necessary, breaking down your thought process into numbered steps.
+4. Review your reasoning.
+  a. Check for potential errors or oversights.
+  b. Confirm or adjust your conclusion if necessary.
+5. Provide your final answer in the "code" field.
 
 Response format:
 {
-  "isBoilerPlateCode": boolean,
   "code": string
 }
 
@@ -223,17 +228,16 @@ Rules:
         aiResponse = JSON.parse(response.message.content);
 
         console.log(
-          `\npost-parse response: ${response}  type: ${typeof response}\n obj: ${JSON.stringify(
+          `\npost-parse response: ${response} type: ${typeof response}\n obj: ${JSON.stringify(
             response
           )}`
         );
 
         if (
-          Object.hasOwn(aiResponse, "isBoilerPlateCode") &&
           aiResponse.isBoilerPlateCode !== undefined &&
           Object.hasOwn(aiResponse, "code")
         ) {
-          console.log("boiler plate: ", aiResponse.isBoilerPlateCode);
+          // console.log("boiler plate: ", aiResponse.isBoilerPlateCode);
           console.log("code: ", aiResponse.code);
           break;
         }
