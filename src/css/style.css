@@ -26,11 +26,58 @@ textarea {
   --blue-500: #4480ef;
   --blue-700: #1c63b9;
   --brand-purple: #ab68ff;
+
+  /* Common variables */
+  --text-primary: var(--gray-950);
+  --text-secondary: #7d7d7d;
+  --border-light: rgba(0, 0, 0, 0.1);
+  --border-medium: rgba(0, 0, 0, 0.15);
+  --border-heavy: rgba(0, 0, 0, 0.2);
+  --border-xheavy: rgba(0, 0, 0, 0.25);
+  --border-sharp: rgb(0 0 0/5%);
+  --link: #2964aa;
+  --link-hover: #749ac8;
+  --selection: #007aff;
 }
 
+/* Light Theme */
+.light {
+  --composer-surface: hsla(0, 0%, 94%, 0.9);
+  --composer-bar_mask-grace-area: 55px;
+  --main-surface-primary: var(--white);
+  --main-surface-secondary: var(--gray-50);
+  --main-surface-tertiary: var(--gray-100);
+  --sidebar-surface-primary: var(--gray-50);
+  --sidebar-surface-secondary: var(--gray-100);
+  --sidebar-surface-tertiary: var(--gray-200);
+  --text-primary: var(--gray-900);
+  --text-secondary: var(--gray-700);
+  --text-tertiary: var(--gray-600);
+  --text-quaternary: var(--gray-500);
+  --text-placeholder: hsla(0, 0%, 0%, 0.5);
+  --text-error: #f93a37;
+  --border-light: rgba(0, 0, 0, 0.1);
+  --border-medium: rgba(0, 0, 0, 0.15);
+  --border-heavy: rgba(0, 0, 0, 0.2);
+  --border-xheavy: rgba(0, 0, 0, 0.25);
+  --border-sharp: rgba(0, 0, 0, 0.05);
+  --link: #2964aa;
+  --link-hover: #5e83b3;
+  --background-color: var(--white);
+  --surface-error: #f93a37;
+  --seeThroughBackground: rgba(0, 0, 0, 0.5);
+}
+
+/* Dark Theme */
 .dark {
   --composer-surface: rgba(50, 50, 50, 0.8);
   --composer-bar_mask-grace-area: 55px;
+  --main-surface-primary: var(--gray-800);
+  --main-surface-secondary: var(--gray-750);
+  --main-surface-tertiary: var(--gray-700);
+  --sidebar-surface-primary: var(--gray-900);
+  --sidebar-surface-secondary: var(--gray-800);
+  --sidebar-surface-tertiary: var(--gray-750);
   --text-primary: var(--gray-100);
   --text-secondary: var(--gray-400);
   --text-tertiary: var(--gray-500);
@@ -42,18 +89,113 @@ textarea {
   --border-heavy: hsla(0, 0%, 100%, 0.2);
   --border-xheavy: hsla(0, 0%, 100%, 0.25);
   --border-sharp: hsla(0, 0%, 100%, 0.05);
-  --main-surface-primary: var(--gray-800);
-  --main-surface-secondary: var(--gray-750);
-  --main-surface-tertiary: var(--gray-700);
-  --sidebar-surface-primary: var(--gray-900);
-  --sidebar-surface-secondary: var(--gray-800);
-  --sidebar-surface-tertiary: var(--gray-750);
   --link: #7ab7ff;
   --link-hover: #5e83b3;
-  --surface-error: 249 58 55;
+  --background-color: var(--gray-900);
+  --surface-error: #f93a37;
+  --seeThroughBackground: rgba(255, 255, 255, 0.5);
 }
 
-html {
+body {
+  font-family: Arial, sans-serif;
+  background-color: var(--background-color);
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-items: center;
+}
+
+/* Add more shared styles for body, containers, and other elements as needed */
+#settingsButton {
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+#settingsButton:hover {
+  color: var(--text-secondary);
+}
+
+.settingsMenu {
+  height: 0%;
+  width: 100%;
+  background: inherit;
+  color: var(--text-primary);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Example button to toggle themes */
+#themeToggle {
+  padding: 10px;
+  margin: 5px;
+  aspect-ratio: 2/1;
+  width: 55px;
+  background-color: var(--main-surface-secondary);
+  border: 1px solid var(--border-medium);
+  cursor: pointer;
+  color: var(--text-primary);
+  border-radius: 8px;
+}
+
+#themeToggle:hover {
+  background-color: var(--main-surface-primary);
+  color: var(--text-secondary);
+  border-color: var(--border-heavy);
+  box-shadow: 3px 3px 5px black;
+}
+
+#settingMenuCloseButton {
+  align-self: flex-end;
+  font-size: 32px;
+  color: var(--text-primary);
+}
+#settingMenuCloseButton:hover {
+  color: var(--text-error);
+}
+
+#user_systemPrompt {
+  height: 100px;
+}
+
+#embedDocs {
+  min-height: 50px;
+  border: var(--border-medium) 1px solid;
+}
+
+#addFileButtonEmbed {
+  cursor: pointer;
+  width: 10%;
+  background-color: var(--composer-surface);
+  border-radius: 8px;
+  color: var(--text-primary);
+}
+
+#addFileButtonEmbed:hover {
+  color: var(--text-secondary);
+  box-shadow: 3px 3px 5px black;
+}
+
+#saveEmbeddedDocs {
+  width: 20%;
+  padding: 5px;
+  cursor: pointer;
+  background-color: var(--composer-surface);
+  color: var(--text-primary);
+  border-radius: 8px;
+}
+
+#saveEmbeddedDocs:hover {
+  background-color: var(--main-surface-secondary);
+  color: var(--text-secondary);
+  box-shadow: 3px 3px 5px black;
+}
+
+/* html {
   --composer-surface: hsla(0, 0%, 94%, 0.9);
   --composer-bar_mask-grace-area: 25px;
   --text-primary: var(--gray-950);
@@ -79,19 +221,7 @@ html {
   --link: #2964aa;
   --link-hover: #749ac8;
   --selection: #007aff;
-}
-
-body {
-  font-family: Arial, sans-serif;
-  background-color: #171717;
-  margin: 0;
-  padding: 0;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-items: center;
-}
+} */
 
 .container {
   width: 95%;
@@ -101,11 +231,12 @@ body {
   position: relative;
   margin: auto;
   padding: 20px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border-light);
   border-radius: 8px;
-  background-color: #212121;
+  background-color: var(--main-surface-tertiary);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 #chatsContainer {
@@ -137,7 +268,7 @@ body {
   padding: 8px 8px 8px 32px;
   text-decoration: none;
   font-size: 25px;
-  color: #818181;
+  color: var(--text-secondary);
   display: block;
   transition: 0.3s;
 }
@@ -146,14 +277,14 @@ body {
 .side-panel .closebtn {
   position: absolute;
   top: 0;
-  right: 25px;
+  right: 5px;
   font-size: 36px;
   margin-left: 50px;
 }
 
 /* When you mouse over the navigation links, change their color */
 .side-panel a:hover {
-  color: #f1f1f1;
+  color: var(--text-secondary);
 }
 
 .closebtn {
@@ -164,10 +295,16 @@ body {
   color: var(--red-700);
 }
 
-#openSidePanelBtn:hover {
+#openSidePanelBtn,
+#newChatButton {
   padding: 2px;
-  background: #9a9a9a76;
+  /* background: var(--text-secondary); */
+  /* color: var(--text-primary); */
   border-radius: 4px;
+}
+#openSidePanelBtn:hover,
+#newChatButton:hover {
+  color: var(--selection);
 }
 
 .label {
@@ -183,7 +320,8 @@ body {
 }
 
 .label:hover {
-  background-color: var(--gray-700);
+  background-color: var(--sidebar-surface-secondary);
+  color: var(--text-primary);
 }
 
 .navMenu {
@@ -230,7 +368,7 @@ body {
 .userIcon {
   aspect-ratio: 1/1;
   width: 30px;
-  color: var(--gray-100);
+  color: var(--text-primary);
   background: var(--blue-700);
   border-radius: 100%;
   display: flex;
@@ -255,14 +393,6 @@ body {
   height: max-content;
   border-radius: 8px;
   overflow-x: auto;
-}
-
-.appendedDocs {
-  width: 100%;
-  background: var(--gray-100);
-  color: #000;
-  padding: 3px 5px;
-  border-radius: 3px;
 }
 
 .ai-message {
@@ -302,13 +432,14 @@ body {
 }
 
 .message-options {
-  height: 20px;
+  /* height: 30px; */
   width: 100%;
   background: inherit;
   border-radius: 8px;
   display: flex;
   gap: 2px;
-  padding: 5px;
+  align-items: center;
+  /* padding: 5px; */
 }
 
 .clipboard-icon-container {
@@ -320,27 +451,24 @@ body {
   border-radius: 4px;
 }
 
-.clipboard-icon-container:hover {
-  background: #888;
-}
-
 .clipboard-icon {
   position: absolute;
   top: 5px;
   right: 10px;
   cursor: pointer;
-  color: #fff;
+  color: var(--text-secondary);
   font-size: 16px;
 }
 
-.clipboard-icon:hover {
-  color: #ccc;
+.clipboard-icon-messages:hover {
+  color: var(--link-hover);
 }
 
 .clipboard-icon-messages {
   cursor: pointer;
-  color: #fff;
+  color: var(--text-secondary);
   font-size: 12px;
+  padding-top: 2px;
 }
 
 #promptBar {
@@ -399,7 +527,7 @@ body {
   padding: 5px;
   cursor: pointer;
   border: 1px solid;
-  border-color: var(--gray-700);
+  border-color: var(--border-medium);
   width: 100px;
   height: 75px;
   display: flex;
@@ -409,7 +537,7 @@ body {
 }
 
 .promptSuggestions:hover {
-  border-color: var(--gray-600);
+  border-color: var(--border-heavy);
 }
 
 #userQuery {
@@ -418,9 +546,9 @@ body {
   min-height: 62px;
   padding: 10px;
   padding-left: 15px;
-  background: #606060;
-  color: #fff;
-  border: 1px solid #ddd;
+  background: var(--main-surface-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-heavy);
   border-radius: 25px;
   position: absolute;
   bottom: 0;
@@ -429,20 +557,32 @@ body {
 }
 
 #userQuery::placeholder {
-  color: #f9f9f9;
+  color: var(--text-primary);
   padding-top: 10px;
 }
 
 /* For older Firefox versions */
 #userQuery::-moz-placeholder {
-  color: #f9f9f9;
+  color: var(--text-primary);
   padding-top: 10px;
 }
 
 /* For older Internet Explorer versions */
 #userQuery:-ms-input-placeholder {
-  color: #f9f9f9;
+  color: var(--text-primary);
   padding-top: 10px;
+}
+
+.appendedDocs {
+  width: 100%;
+  background: var(--composer-surface);
+  color: var(--text-primary);
+  padding: 3px 5px;
+  border-radius: 3px;
+}
+
+.appended-document {
+  color: var(--text-primary);
 }
 
 .appended-documents-container {
@@ -453,7 +593,6 @@ body {
   border-radius: 4px;
   margin-bottom: 10px;
   background-color: inherit;
-
   width: 100%;
 }
 
@@ -462,8 +601,8 @@ body {
   align-items: center;
   padding: 5px;
   margin-right: 10px;
-  background-color: #f9f9f9;
-  border: 1px solid #ddd;
+  background-color: var(--main-surface-primary);
+  border: 1px solid var(--border-light);
   border-radius: 4px;
 }
 
@@ -472,6 +611,11 @@ body {
 }
 
 .appended-document .remove-icon {
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.appended-document .remove-icon:hover {
   cursor: pointer;
   color: red;
 }
@@ -482,10 +626,10 @@ body {
   border: none;
   /* background-color: inherit; */
   border-radius: 50%;
-  color: #00000027;
-  background: #717171;
+  color: rgba(0, 0, 0, 0.1);
+  background: var(--seeThroughBackground);
   position: absolute;
-  bottom: 10%;
+  bottom: 8%;
   right: 5px;
   transform: scale(0.9);
   /* transform: translateY(-10%); */
@@ -493,10 +637,18 @@ body {
 
 #addFileButton {
   /* padding: 3px 5px; */
-  color: #fff;
+  color: var(--text-primary);
   right: 45px;
   cursor: pointer;
   background: none;
+}
+
+#addFileButton:hover {
+  color: var(--selection);
+}
+
+#sendButton svg {
+  transform: scaleX(1.6);
 }
 
 .icon-2xl {
@@ -522,8 +674,8 @@ body {
   width: max-content;
   min-width: fit-content;
   font-size: smaller;
-  background-color: black;
-  color: #fff;
+  background-color: var(--main-surface-secondary);
+  color: var(--text-primary);
   text-align: center;
   border-radius: 8px;
   padding: 4px;
@@ -555,10 +707,11 @@ body {
   position: absolute;
   bottom: -50px; /* Position below the label */
   right: 2px; /* Align to the right */
-  background-color: #fff; /* Background color for the menu */
-  border: 1px solid #ddd; /* Border around the menu */
+  color: var(--text-primary);
+  background-color: var(--background-color); /* Background color for the menu */
+  border: 1px solid var(--border-light); /* Border around the menu */
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Shadow for a 3D effect */
-  padding: 10px;
+  padding: 5px 1px;
   z-index: 1000; /* Ensure the menu is above other content */
   border-radius: 4px;
 }
@@ -571,9 +724,10 @@ body {
 /* Styling for menu buttons */
 .menu button {
   display: block;
+  color: inherit;
   width: 100%;
-  padding: 5px;
   border: none;
+  padding: 5px 3px;
   background: inherit;
   border-radius: 4px;
   margin: 2px 0;
@@ -581,7 +735,7 @@ body {
 }
 
 .menu button:hover {
-  background: var(--gray-200);
+  background: var(--main-surface-secondary);
   color: var(--red-500);
   fill: var(--red-500);
 }

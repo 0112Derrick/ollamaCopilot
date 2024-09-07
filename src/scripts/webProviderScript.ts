@@ -162,6 +162,14 @@ const deleteIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" 
 
 const ellipsesSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-md"><path fill-rule="evenodd" clip-rule="evenodd" d="M3 12C3 10.8954 3.89543 10 5 10C6.10457 10 7 10.8954 7 12C7 13.1046 6.10457 14 5 14C3.89543 14 3 13.1046 3 12ZM10 12C10 10.8954 10.8954 10 12 10C13.1046 10 14 10.8954 14 12C14 13.1046 13.1046 14 12 14C10.8954 14 10 13.1046 10 12ZM17 12C17 10.8954 17.8954 10 19 10C20.1046 10 21 10.8954 21 12C21 13.1046 20.1046 14 19 14C17.8954 14 17 13.1046 17 12Z" fill="currentColor"></path><span class="tooltiptext">Options</span></svg>`;
 
+const closeSvgIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-sm"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.63603 5.63604C6.02656 5.24552 6.65972 5.24552 7.05025 5.63604L12 10.5858L16.9497 5.63604C17.3403 5.24552 17.9734 5.24552 18.364 5.63604C18.7545 6.02657 18.7545 6.65973 18.364 7.05025L13.4142 12L18.364 16.9497C18.7545 17.3403 18.7545 17.9734 18.364 18.364C17.9734 18.7545 17.3403 18.7545 16.9497 18.364L12 13.4142L7.05025 18.364C6.65972 18.7545 6.02656 18.7545 5.63603 18.364C5.24551 17.9734 5.24551 17.3403 5.63603 16.9497L10.5858 12L5.63603 7.05025C5.24551 6.65973 5.24551 6.02657 5.63603 5.63604Z" fill="currentColor"></path></svg>`;
+
+const copySvgIcon = `<?xml version="1.0" encoding="utf-8"?>
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M6 11C6 8.17157 6 6.75736 6.87868 5.87868C7.75736 5 9.17157 5 12 5H15C17.8284 5 19.2426 5 20.1213 5.87868C21 6.75736 21 8.17157 21 11V16C21 18.8284 21 20.2426 20.1213 21.1213C19.2426 22 17.8284 22 15 22H12C9.17157 22 7.75736 22 6.87868 21.1213C6 20.2426 6 18.8284 6 16V11Z" stroke="currentColor" stroke-width="1.5"/>
+<path d="M6 19C4.34315 19 3 17.6569 3 16V10C3 6.22876 3 4.34315 4.17157 3.17157C5.34315 2 7.22876 2 11 2H15C16.6569 2 18 3.34315 18 5" stroke="currentColor" stroke-width="1.5"/>
+</svg>`;
+
 const requestData = () => {
   vscode.postMessage({
     command: "requestImageUri",
@@ -200,8 +208,9 @@ async function main() {
     "#loadingIndicator"
   ) as HTMLInputElement;
 
-  const closeButtons: NodeListOf<HTMLElement> =
-    document.querySelectorAll(".closebtn");
+  const closeButton: HTMLElement = document.querySelector(
+    "#sideBarCloseButton"
+  ) as HTMLElement;
 
   const openSidePanelBtn = document.querySelector(
     "#openSidePanelBtn"
@@ -219,6 +228,14 @@ async function main() {
     "#newChatButton"
   ) as HTMLElement;
   const addFileButton = document.querySelector("#addFileButton") as HTMLElement;
+  const container = document.querySelector(".container") as HTMLElement;
+  const settingsButton = document.querySelector(
+    "#settingsButton"
+  ) as HTMLElement;
+  const settingMenuCloseButton = document.querySelector(
+    "#settingMenuCloseButton"
+  ) as HTMLElement;
+  const themeToggle = document.querySelector("#themeToggle") as HTMLElement;
 
   // console.log("\nOllama img\n", ollamaImg);
   const initialConversationView = `
@@ -334,6 +351,7 @@ async function main() {
           </div>
           `
     );
+
     labelOption.addEventListener("click", (event) => {
       if (labelOption.classList.contains("active")) {
         labelOption.classList.remove("active");
@@ -401,25 +419,33 @@ async function main() {
     !userQuery ||
     !sendButton ||
     !loadingIndicator ||
-    !closeButtons ||
+    !closeButton ||
     !openSidePanelBtn ||
     !conversation ||
     !recentChatsContainer ||
     !newChatWindowButton ||
-    !addFileButton
+    !addFileButton ||
+    !container ||
+    !settingsButton ||
+    !settingMenuCloseButton ||
+    !themeToggle
   ) {
     console.error("One or more elements are missing from the webview.");
     console.error(` 
     ${!userQuery ? "userQuery missing" : ""} 
       ${!sendButton ? "sendButton missing" : ""} 
       ${!loadingIndicator ? "loadingIndicator missing" : ""} 
-      ${!closeButtons ? "closeButtons missing" : ""} 
+      ${!closeButton ? "closeButton missing" : ""} 
       ${!openSidePanelBtn ? "openSidePanelBtn missing" : ""} 
       ${!conversation ? "conversation container missing" : ""} 
       ${!recentChatsContainer ? "recentChatsContainer missing" : ""} 
       ${!newChatWindowButton ? "newChatWindowButton missing" : ""} 
       ${!addFileButton ? "addFileButton missing" : ""}
-    }`);
+      ${!container ? "container missing" : ""}
+      ${!settingsButton ? "settingsButton missing" : ""}
+      ${!settingMenuCloseButton ? "settings close button missing" : ""}
+      ${!themeToggle ? "theme toggle missing" : ""}
+    `);
     return;
   }
 
@@ -454,6 +480,14 @@ async function main() {
     `\nQueries made: ${queriesMade} | conversation container: ${conversation.innerHTML.trim()}`
   );
 
+  //Sets html to intial conversation view and adds event listeners to the suggested prompts buttons
+  if (queriesMade === 0 && conversation.innerHTML.trim() === "") {
+    conversation.innerHTML = initialConversationView;
+    addEventListenerToClass(".promptSuggestions", "click", (e: MouseEvent) => {
+      promptAI((e.target as HTMLDivElement).innerHTML);
+    });
+  }
+
   newChatWindowButton.addEventListener("click", handleCreateConversation);
 
   addFileButton.addEventListener("click", async () => {
@@ -462,18 +496,26 @@ async function main() {
     });
   });
 
-  if (queriesMade === 0 && conversation.innerHTML.trim() === "") {
-    conversation.innerHTML = initialConversationView;
-    addEventListenerToClass(".promptSuggestions", "click", (e: MouseEvent) => {
-      promptAI((e.target as HTMLDivElement).innerHTML);
-    });
-  }
+  settingsButton.addEventListener("click", openSettingsMenu);
 
-  closeButtons.forEach((btn) => {
-    btn.addEventListener("click", closeSidePanel);
-  });
+  settingMenuCloseButton.addEventListener("click", closeSettingsMenu);
+
+  closeButton.addEventListener("click", closeSidePanel);
 
   openSidePanelBtn.addEventListener("click", openSidePanel);
+
+  themeToggle.addEventListener("click", () => {
+    const body = document.body;
+    if (body.classList.contains("dark")) {
+      body.classList.remove("dark");
+      body.classList.add("light");
+      themeToggle.innerText = "Light";
+    } else {
+      body.classList.remove("light");
+      body.classList.add("dark");
+      themeToggle.innerText = "Dark";
+    }
+  });
 
   userQuery.addEventListener("input", (e) => {
     if (!e.target) {
@@ -530,7 +572,7 @@ async function main() {
 
       const removeIcon = document.createElement("span");
       removeIcon.className = "remove-icon";
-      removeIcon.innerText = "❌";
+      removeIcon.innerHTML = closeSvgIcon;
       removeIcon.onclick = () => {
         documentsAppendedToQuery.splice(index, 1); // Remove the document from the array
         updateAppendedDocumentsUI(); // Refresh the UI
@@ -671,7 +713,7 @@ async function main() {
 
     const clipboardIcon = document.createElement("span");
     clipboardIcon.className = "clipboard-icon-messages";
-    clipboardIcon.innerText = "📋";
+    clipboardIcon.innerHTML = copySvgIcon;
 
     clipboardIconContainer.appendChild(clipboardIcon);
     messageOptions.appendChild(clipboardIconContainer);
@@ -734,7 +776,7 @@ async function main() {
 
       const clipboardIcon = document.createElement("span");
       clipboardIcon.className = "clipboard-icon";
-      clipboardIcon.innerText = "📋";
+      clipboardIcon.innerHTML = copySvgIcon;
       clipboardIcon.onclick = () => copyToClipboard(code);
 
       const codeBlock = document.createElement("pre");
@@ -756,7 +798,7 @@ async function main() {
       clipboardIconContainer.className = "clipboard-icon-container tooltip";
       clipboardIconContainer.onclick = () => {
         copyToClipboard(
-          aiMessage.innerText.replaceAll("📋", "").replace("Copy", "")
+          aiMessage.innerText.replaceAll(copySvgIcon, "").replace("Copy", "")
         );
       };
 
@@ -767,7 +809,7 @@ async function main() {
 
       const clipboardIcon_ = document.createElement("span");
       clipboardIcon_.className = "clipboard-icon-messages";
-      clipboardIcon_.innerText = "📋";
+      clipboardIcon_.innerHTML = copySvgIcon;
 
       clipboardIconContainer.appendChild(clipboardIcon_);
 
@@ -920,15 +962,35 @@ async function main() {
 
   windowListener();
 
+  function openSettingsMenu() {
+    const settingsMenu = document.querySelector("#settingsMenu") as HTMLElement;
+    if (!settingsMenu || !conversation) {
+      return;
+    }
+    settingsMenu.style.height = "100%";
+    conversation.style.height = "0";
+  }
+
+  function closeSettingsMenu() {
+    const settingsMenu = document.querySelector("#settingsMenu") as HTMLElement;
+    if (!settingsMenu || !conversation) {
+      return;
+    }
+    settingsMenu.style.height = "0";
+    conversation.style.height = "100%";
+  }
+
   function openSidePanel() {
     const sidePanel = document.getElementById("sidePanel");
     const container = document.querySelector(".container");
     if (!sidePanel || !container) {
       return;
     }
+
     sidePanel.style.width = "175px"; // Set the width of the side panel
     sidePanel.style.paddingLeft = "20px";
     container.classList.add("with-panel"); // Move content to the right
+    document.addEventListener("click", handleClickOutsidePanel);
   }
 
   function closeSidePanel() {
@@ -940,6 +1002,22 @@ async function main() {
     sidePanel.style.width = "0"; // Reset the width of the side panel
     sidePanel.style.paddingLeft = "0";
     container.classList.remove("with-panel"); // Move content back
+    document.removeEventListener("click", handleClickOutsidePanel);
+  }
+
+  // Function to handle clicks outside the side panel
+  function handleClickOutsidePanel(event: Event) {
+    const sidePanel = document.getElementById("sidePanel");
+    openSidePanelBtn;
+    console.log(event.target);
+    // Check if the click was outside the side panel and its content
+    if (
+      sidePanel &&
+      !sidePanel.contains(event.target as Node) &&
+      !openSidePanelBtn.contains(event.target as Node)
+    ) {
+      closeSidePanel();
+    }
   }
 }
 main();

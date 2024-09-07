@@ -4,7 +4,13 @@ import {
   llama3,
   defaultURLChat,
 } from "../external/ollama";
-import { newChatSvg, sideBarSvg, sendSvgIcon, clipSvgIcon } from "../svgs";
+import {
+  newChatSvg,
+  sideBarSvg,
+  sendSvgIcon,
+  clipSvgIcon,
+  closeSvgIcon,
+} from "../svgs";
 import { isValidJson } from "../utils";
 
 type userMessageRole = "user";
@@ -354,14 +360,14 @@ export class WebViewProvider implements vscode.WebviewViewProvider {
   <head>
       <link rel="stylesheet" href="${styleUri}" />
   </head>
-  <body>
+  <body class="dark">
     <div class="container">
     <div id="sidePanel" class="side-panel">
-      <a class="closebtn">&times;</a>
+      <a id='sideBarCloseButton' class="closebtn">&times;</a>
       <!--Container for all of the saved chats.-->
       <div id="chatsContainer">
       </div>
-      <div id="settingsContainer">Settings</div>
+      <div id="settingsButton">Settings</div>
     </div>
     <div class="navMenu">
     <div class="tooltip" id="openSidePanelBtn">
@@ -376,6 +382,21 @@ export class WebViewProvider implements vscode.WebviewViewProvider {
 
     <h1 id="title">Ollama Copilot</h1>
     </div>
+    <div class="settingsMenu" id="settingsMenu">
+    <a id='settingMenuCloseButton' class="closebtn">&times;</a>
+    <label for="themeToggle">Switch themes:</label>
+    <button id="themeToggle">Dark</button>
+    
+    <label for="user_systemPrompt">System Prompt:</label>
+    <textarea id="user_systemPrompt" placeholder="System prompt"></textarea>
+    <label for="addFileButtonEmbed">Embed Document:</label>
+    <div id="embedDocs"></div>
+    <div class="flex-nowrap">
+    <button id="addFileButtonEmbed" class="tooltip chatIcon pt-4">${clipSvgIcon}</button>
+    <button id="saveEmbeddedDocs">Save</button>
+    </div>
+    </div>
+
       <!--Container for all of the chat messages.-->
       <div id="conversation">
       </div>
