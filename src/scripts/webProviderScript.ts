@@ -208,8 +208,9 @@ async function main() {
     "#loadingIndicator"
   ) as HTMLInputElement;
 
-  const closeButtons: NodeListOf<HTMLElement> =
-    document.querySelectorAll(".closebtn");
+  const closeButton: HTMLElement = document.querySelector(
+    "#sideBarCloseButton"
+  ) as HTMLElement;
 
   const openSidePanelBtn = document.querySelector(
     "#openSidePanelBtn"
@@ -228,6 +229,13 @@ async function main() {
   ) as HTMLElement;
   const addFileButton = document.querySelector("#addFileButton") as HTMLElement;
   const container = document.querySelector(".container") as HTMLElement;
+  const settingsButton = document.querySelector(
+    "#settingsButton"
+  ) as HTMLElement;
+  const settingMenuCloseButton = document.querySelector(
+    "#settingMenuCloseButton"
+  ) as HTMLElement;
+  const themeToggle = document.querySelector("#themeToggle") as HTMLElement;
 
   // console.log("\nOllama img\n", ollamaImg);
   const initialConversationView = `
@@ -343,6 +351,7 @@ async function main() {
           </div>
           `
     );
+
     labelOption.addEventListener("click", (event) => {
       if (labelOption.classList.contains("active")) {
         labelOption.classList.remove("active");
@@ -410,27 +419,33 @@ async function main() {
     !userQuery ||
     !sendButton ||
     !loadingIndicator ||
-    !closeButtons ||
+    !closeButton ||
     !openSidePanelBtn ||
     !conversation ||
     !recentChatsContainer ||
     !newChatWindowButton ||
     !addFileButton ||
-    !container
+    !container ||
+    !settingsButton ||
+    !settingMenuCloseButton ||
+    !themeToggle
   ) {
     console.error("One or more elements are missing from the webview.");
     console.error(` 
     ${!userQuery ? "userQuery missing" : ""} 
       ${!sendButton ? "sendButton missing" : ""} 
       ${!loadingIndicator ? "loadingIndicator missing" : ""} 
-      ${!closeButtons ? "closeButtons missing" : ""} 
+      ${!closeButton ? "closeButton missing" : ""} 
       ${!openSidePanelBtn ? "openSidePanelBtn missing" : ""} 
       ${!conversation ? "conversation container missing" : ""} 
       ${!recentChatsContainer ? "recentChatsContainer missing" : ""} 
       ${!newChatWindowButton ? "newChatWindowButton missing" : ""} 
       ${!addFileButton ? "addFileButton missing" : ""}
       ${!container ? "container missing" : ""}
-    }`);
+      ${!settingsButton ? "settingsButton missing" : ""}
+      ${!settingMenuCloseButton ? "settings close button missing" : ""}
+      ${!themeToggle ? "theme toggle missing" : ""}
+    `);
     return;
   }
 
@@ -465,6 +480,14 @@ async function main() {
     `\nQueries made: ${queriesMade} | conversation container: ${conversation.innerHTML.trim()}`
   );
 
+  //Sets html to intial conversation view and adds event listeners to the suggested prompts buttons
+  if (queriesMade === 0 && conversation.innerHTML.trim() === "") {
+    conversation.innerHTML = initialConversationView;
+    addEventListenerToClass(".promptSuggestions", "click", (e: MouseEvent) => {
+      promptAI((e.target as HTMLDivElement).innerHTML);
+    });
+  }
+
   newChatWindowButton.addEventListener("click", handleCreateConversation);
 
   addFileButton.addEventListener("click", async () => {
@@ -473,18 +496,26 @@ async function main() {
     });
   });
 
-  if (queriesMade === 0 && conversation.innerHTML.trim() === "") {
-    conversation.innerHTML = initialConversationView;
-    addEventListenerToClass(".promptSuggestions", "click", (e: MouseEvent) => {
-      promptAI((e.target as HTMLDivElement).innerHTML);
-    });
-  }
+  settingsButton.addEventListener("click", openSettingsMenu);
 
-  closeButtons.forEach((btn) => {
-    btn.addEventListener("click", closeSidePanel);
-  });
+  settingMenuCloseButton.addEventListener("click", closeSettingsMenu);
+
+  closeButton.addEventListener("click", closeSidePanel);
 
   openSidePanelBtn.addEventListener("click", openSidePanel);
+
+  themeToggle.addEventListener("click", () => {
+    const body = document.body;
+    if (body.classList.contains("dark")) {
+      body.classList.remove("dark");
+      body.classList.add("light");
+      themeToggle.innerText = "Light";
+    } else {
+      body.classList.remove("light");
+      body.classList.add("dark");
+      themeToggle.innerText = "Dark";
+    }
+  });
 
   userQuery.addEventListener("input", (e) => {
     if (!e.target) {
@@ -930,6 +961,24 @@ async function main() {
   };
 
   windowListener();
+
+  function openSettingsMenu() {
+    const settingsMenu = document.querySelector("#settingsMenu") as HTMLElement;
+    if (!settingsMenu || !conversation) {
+      return;
+    }
+    settingsMenu.style.height = "100%";
+    conversation.style.height = "0";
+  }
+
+  function closeSettingsMenu() {
+    const settingsMenu = document.querySelector("#settingsMenu") as HTMLElement;
+    if (!settingsMenu || !conversation) {
+      return;
+    }
+    settingsMenu.style.height = "0";
+    conversation.style.height = "100%";
+  }
 
   function openSidePanel() {
     const sidePanel = document.getElementById("sidePanel");

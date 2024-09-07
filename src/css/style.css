@@ -65,6 +65,7 @@ textarea {
   --link-hover: #5e83b3;
   --background-color: var(--white);
   --surface-error: #f93a37;
+  --seeThroughBackground: rgba(0, 0, 0, 0.5);
 }
 
 /* Dark Theme */
@@ -92,6 +93,7 @@ textarea {
   --link-hover: #5e83b3;
   --background-color: var(--gray-900);
   --surface-error: #f93a37;
+  --seeThroughBackground: rgba(255, 255, 255, 0.5);
 }
 
 body {
@@ -107,19 +109,93 @@ body {
 }
 
 /* Add more shared styles for body, containers, and other elements as needed */
+#settingsButton {
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+#settingsButton:hover {
+  color: var(--text-secondary);
+}
+
+.settingsMenu {
+  height: 0%;
+  width: 100%;
+  background: inherit;
+  color: var(--text-primary);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 
 /* Example button to toggle themes */
 #themeToggle {
-  position: fixed;
-  top: 10px;
-  right: 10px;
   padding: 10px;
-  background-color: var(--gray-200);
-  border: 1px solid var(--gray-400);
+  margin: 5px;
+  aspect-ratio: 2/1;
+  width: 55px;
+  background-color: var(--main-surface-secondary);
+  border: 1px solid var(--border-medium);
   cursor: pointer;
+  color: var(--text-primary);
+  border-radius: 8px;
 }
 
-html {
+#themeToggle:hover {
+  background-color: var(--main-surface-primary);
+  color: var(--text-secondary);
+  border-color: var(--border-heavy);
+  box-shadow: 3px 3px 5px black;
+}
+
+#settingMenuCloseButton {
+  align-self: flex-end;
+  font-size: 32px;
+  color: var(--text-primary);
+}
+#settingMenuCloseButton:hover {
+  color: var(--text-error);
+}
+
+#user_systemPrompt {
+  height: 100px;
+}
+
+#embedDocs {
+  min-height: 50px;
+  border: var(--border-medium) 1px solid;
+}
+
+#addFileButtonEmbed {
+  cursor: pointer;
+  width: 10%;
+  background-color: var(--composer-surface);
+  border-radius: 8px;
+  color: var(--text-primary);
+}
+
+#addFileButtonEmbed:hover {
+  color: var(--text-secondary);
+  box-shadow: 3px 3px 5px black;
+}
+
+#saveEmbeddedDocs {
+  width: 20%;
+  padding: 5px;
+  cursor: pointer;
+  background-color: var(--composer-surface);
+  color: var(--text-primary);
+  border-radius: 8px;
+}
+
+#saveEmbeddedDocs:hover {
+  background-color: var(--main-surface-secondary);
+  color: var(--text-secondary);
+  box-shadow: 3px 3px 5px black;
+}
+
+/* html {
   --composer-surface: hsla(0, 0%, 94%, 0.9);
   --composer-bar_mask-grace-area: 25px;
   --text-primary: var(--gray-950);
@@ -145,7 +221,7 @@ html {
   --link: #2964aa;
   --link-hover: #749ac8;
   --selection: #007aff;
-}
+} */
 
 .container {
   width: 95%;
@@ -155,11 +231,12 @@ html {
   position: relative;
   margin: auto;
   padding: 20px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border-light);
   border-radius: 8px;
-  background-color: #212121;
+  background-color: var(--main-surface-tertiary);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 #chatsContainer {
@@ -218,10 +295,16 @@ html {
   color: var(--red-700);
 }
 
-#openSidePanelBtn:hover {
+#openSidePanelBtn,
+#newChatButton {
   padding: 2px;
-  background: var(--text-secondary);
+  /* background: var(--text-secondary); */
+  /* color: var(--text-primary); */
   border-radius: 4px;
+}
+#openSidePanelBtn:hover,
+#newChatButton:hover {
+  color: var(--selection);
 }
 
 .label {
@@ -463,9 +546,9 @@ html {
   min-height: 62px;
   padding: 10px;
   padding-left: 15px;
-  background: #606060;
-  color: #fff;
-  border: 1px solid #ddd;
+  background: var(--main-surface-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-heavy);
   border-radius: 25px;
   position: absolute;
   bottom: 0;
@@ -474,19 +557,19 @@ html {
 }
 
 #userQuery::placeholder {
-  color: #f9f9f9;
+  color: var(--text-primary);
   padding-top: 10px;
 }
 
 /* For older Firefox versions */
 #userQuery::-moz-placeholder {
-  color: #f9f9f9;
+  color: var(--text-primary);
   padding-top: 10px;
 }
 
 /* For older Internet Explorer versions */
 #userQuery:-ms-input-placeholder {
-  color: #f9f9f9;
+  color: var(--text-primary);
   padding-top: 10px;
 }
 
@@ -544,7 +627,7 @@ html {
   /* background-color: inherit; */
   border-radius: 50%;
   color: rgba(0, 0, 0, 0.1);
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--seeThroughBackground);
   position: absolute;
   bottom: 8%;
   right: 5px;
@@ -561,7 +644,7 @@ html {
 }
 
 #addFileButton:hover {
-  color: var(--link-hover);
+  color: var(--selection);
 }
 
 #sendButton svg {
