@@ -139,9 +139,14 @@ export class WebViewProvider implements vscode.WebviewViewProvider {
             if (typeof response === "string") {
               data = response;
             } else {
-              let msg =
-                response.choices.at(-1)?.message.content ||
-                response.message.content;
+              let msg = "";
+              let r = response.choices.at(-1);
+              if (r) {
+                msg = r.message.content;
+              } else {
+                msg = response.message.content;
+              }
+
               if (msg) {
                 if (isValidJson(msg)) {
                   data = JSON.parse(msg);
@@ -312,16 +317,20 @@ export class WebViewProvider implements vscode.WebviewViewProvider {
             console.log("Label response: " + JSON.stringify(labelResponse));
             let data = "";
 
-            if (isOpenAiModel) {
-              let label =
-                labelResponse.choices.at(-1)?.message.content ||
-                labelResponse.message.content;
-              console.log(label);
-              if (label) {
-                console.log("label: " + label);
-                data = label;
-              }
+            const lab = labelResponse.choices.at(-1);
+            let label = "";
+            if (lab) {
+              label = lab.message.content;
+            } else {
+              label = labelResponse.message.content;
             }
+
+            console.log(label);
+            if (label) {
+              console.log("label: " + label);
+              data = label;
+            }
+
             if (isValidJson(data)) {
               let obj: { label: string } = JSON.parse(data);
               if (obj.hasOwnProperty("label")) {

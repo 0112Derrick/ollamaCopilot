@@ -675,15 +675,15 @@ async function main() {
 
     const messageElement = document.createElement("div");
     messageElement.className =
-      sender === "user" ? "user-message" : "ai-message";
+      sender === "user" ? "user-message" : "ai-message clearBackground";
 
     // messageElement.innerText = message;
-    if (messageElement.className === "ai-message") {
+    if (messageElement.className === "ai-message clearBackground") {
       messageElement.insertAdjacentHTML(
         "afterbegin",
         `<div class="flex-nowrap pt-4">
           <img src="${ollamaImg}" alt="Ollama" class="ollama-message-icon"/>
-          <div>${message}</div>
+          <div class="ai-message">${message}</div>
          </div>
         `
       );

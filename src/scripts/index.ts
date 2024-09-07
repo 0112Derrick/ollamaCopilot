@@ -232,9 +232,14 @@ Rules:
         }
 
         if (typeof response !== "string") {
-          let msg =
-            response.choices.at(-1)?.message.content ||
-            response.message.content;
+          let r = response.choices.at(-1);
+          let msg = "";
+          if (r) {
+            msg = r.message.content;
+          } else {
+            msg = response.message.content;
+          }
+
           if (isValidJson(msg)) {
             // Validate if the response is a valid JSON
             aiResponse = JSON.parse(msg);

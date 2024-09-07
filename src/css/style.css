@@ -332,6 +332,7 @@ body {
   justify-items: start;
   gap: 4px;
   padding: 8px;
+  color: var(--text-primary);
 }
 
 .navMenu > div {
@@ -396,7 +397,8 @@ body {
 }
 
 .ai-message {
-  color: white;
+  color: var(--text-primary);
+  background: var(--main-surface-primary);
   width: 100%;
   text-align: left;
   padding: 10px;
@@ -404,6 +406,10 @@ body {
   margin: 10px, 0;
   max-width: 80%;
   position: relative;
+}
+
+.clearBackground {
+  background: unset;
 }
 
 .pre-code-container,
