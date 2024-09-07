@@ -4,7 +4,13 @@ import {
   llama3,
   defaultURLChat,
 } from "../external/ollama";
-import { newChatSvg, sideBarSvg, sendSvgIcon, clipSvgIcon } from "../svgs";
+import {
+  newChatSvg,
+  sideBarSvg,
+  sendSvgIcon,
+  clipSvgIcon,
+  closeSvgIcon,
+} from "../svgs";
 import { isValidJson } from "../utils";
 
 type userMessageRole = "user";
@@ -354,7 +360,7 @@ export class WebViewProvider implements vscode.WebviewViewProvider {
   <head>
       <link rel="stylesheet" href="${styleUri}" />
   </head>
-  <body>
+  <body class="dark">
     <div class="container">
     <div id="sidePanel" class="side-panel">
       <a class="closebtn">&times;</a>
