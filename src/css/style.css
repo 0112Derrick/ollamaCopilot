@@ -64,6 +64,7 @@ textarea {
   --link: #2964aa;
   --link-hover: #5e83b3;
   --background-color: var(--white);
+  --code-container-background-color: var(--gray-600);
   --surface-error: #f93a37;
   --seeThroughBackground: rgba(0, 0, 0, 0.5);
 }
@@ -89,6 +90,7 @@ textarea {
   --border-heavy: hsla(0, 0%, 100%, 0.2);
   --border-xheavy: hsla(0, 0%, 100%, 0.25);
   --border-sharp: hsla(0, 0%, 100%, 0.05);
+  --code-container-background-color: #000;
   --link: #7ab7ff;
   --link-hover: #5e83b3;
   --background-color: var(--gray-900);
@@ -369,9 +371,11 @@ body {
 }
 .userIcon {
   aspect-ratio: 1/1;
-  width: 30px;
-  color: var(--text-primary);
-  background: var(--blue-700);
+  width: 35px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  /* background: var(--blue-700); */
+  background: var(--main-surface-primary);
   border-radius: 100%;
   display: flex;
   align-items: center;
@@ -422,7 +426,7 @@ body {
 }
 
 .code-container {
-  background-color: #000;
+  background-color: var(--code-container-background-color);
   color: #fff;
   padding: 10px;
   border-radius: 4px;
@@ -436,6 +440,10 @@ body {
   white-space: pre-wrap; /* Wraps code content */
   margin: 0;
   font-family: Consolas, "Courier New", monospace;
+}
+
+.code-container .clipboard-icon {
+  color: #fff;
 }
 
 .message-options {
