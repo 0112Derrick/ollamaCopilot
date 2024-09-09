@@ -40,7 +40,7 @@
       },
       {
         "command": "ollama-copilot.improveTheCode",
-        "title": "Offer suggestion on how to improve this code."
+        "title": "Offer a suggestion on how to improve this code."
       },
       {
         "command": "ollama-copilot.refactorCode",
@@ -120,7 +120,7 @@
     "esbuild": "^0.21.5",
     "eslint": "^8.57.0",
     "npm-run-all": "^4.1.5",
-    "typescript": "^5.4.5"
+    "typescript": "^5.5.4"
   },
   "dependencies": {
     "axios": "^1.7.4"

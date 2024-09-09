@@ -85,15 +85,29 @@ class InlineCompletionProvider implements vscode.InlineCompletionItemProvider {
 
     if (this.chunks.length > 0 && this.currentChunkPos < this.chunks.length) {
       const currentLine = document.lineAt(position.line);
-      const lineText = currentLine.text;
+      const lineText = currentLine.text.trim();
       const cursorPosition = position.character;
 
       // Determine the insertion position
       let insertPosition = position;
       let rangeToReplace = new vscode.Range(position, position);
 
-      if (lineText.trim() !== "") {
-        // There's text on the line
+      if (lineText.startsWith("//")) {
+        // Line is a comment, insert on the next line
+        const nextLineNumber = position.line + 1;
+        const nextLinePosition = new vscode.Position(nextLineNumber, 0);
+
+        // Create a new line
+        insertPosition = currentLine.range.end;
+        rangeToReplace = new vscode.Range(insertPosition, insertPosition);
+        return [
+          {
+            insertText: "\n" + this.chunks[this.currentChunkPos],
+            range: rangeToReplace,
+          },
+        ];
+      } else if (lineText !== "") {
+        // There's non-comment text on the line
         const openBracketIndex = lineText.lastIndexOf("(", cursorPosition);
         const openCurlyBraceIndex = lineText.lastIndexOf("{", cursorPosition);
         const closeBracketIndex = lineText.indexOf(")", cursorPosition);
@@ -116,16 +130,17 @@ class InlineCompletionProvider implements vscode.InlineCompletionItemProvider {
           (openSquareBracketIndex !== -1 &&
             closeSquareBracketIndex !== -1 &&
             openSquareBracketIndex < cursorPosition &&
-            cursorPosition < closeBracketIndex)
+            cursorPosition < closeSquareBracketIndex)
         ) {
           // Cursor is inside brackets or braces
           insertPosition = position;
         } else {
           // Insert at the end of the line
           insertPosition = currentLine.range.end;
-          rangeToReplace = new vscode.Range(insertPosition, insertPosition);
         }
       }
+
+      rangeToReplace = new vscode.Range(insertPosition, insertPosition);
 
       return [
         {

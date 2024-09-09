@@ -6,6 +6,9 @@ declare function acquireVsCodeApi(): {
   setState: (newState: any) => void;
 };
 const vscode = acquireVsCodeApi();
+let ollamaImgPromise: Promise<string>;
+let ollamaChatHistoryPromise: Promise<ChatContainer>;
+let ollamaThemePreference: Promise<string>;
 
 function replacer(key: string, value: any) {
   if (value instanceof Map) {
@@ -27,24 +30,37 @@ function reviver(key: string, value: any) {
   return value;
 }
 
-let ollamaImgPromise: Promise<string> = new Promise((resolve) => {
+const createPromises = () => {
+  let resolveImage: (value: string) => void;
+  let resolveChatHistory: (value: ChatContainer) => void;
+  let resolveThemePreference: (value: string) => void;
+
+  ollamaImgPromise = new Promise((resolve) => {
+    resolveImage = resolve;
+  });
+
+  ollamaChatHistoryPromise = new Promise((resolve) => {
+    resolveChatHistory = resolve;
+  });
+
+  ollamaThemePreference = new Promise((resolve) => {
+    resolveThemePreference = resolve;
+  });
+
   window.addEventListener("message", (event) => {
     const message = event.data;
-    if (message.command === "setImageUri") {
-      resolve(message.imageUri);
-    }
-  });
-});
-
-let ollamaChatHistoryPromise: Promise<ChatContainer> = new Promise(
-  (resolve) => {
-    window.addEventListener("message", (event) => {
-      const message = event.data;
-      if (message.command === "setChatHistory") {
+    switch (message.command) {
+      case "setThemePreference":
+        resolveThemePreference(message.theme);
+        break;
+      case "setImageUri":
+        resolveImage(message.imageUri);
+        break;
+      case "setChatHistory":
         if (isValidJson(message.data)) {
-          resolve(JSON.parse(message.data, reviver));
+          resolveChatHistory(JSON.parse(message.data, reviver));
         } else {
-          resolve(
+          resolveChatHistory(
             new Map<
               string,
               {
@@ -57,10 +73,18 @@ let ollamaChatHistoryPromise: Promise<ChatContainer> = new Promise(
             >()
           );
         }
-      }
-    });
-  }
-);
+        break;
+    }
+  });
+};
+createPromises();
+
+const sendSignalOnLoad = () => {
+  window.addEventListener("load", () => {
+    vscode.postMessage({ command: "webviewReady" });
+  });
+};
+sendSignalOnLoad();
 
 function getCurrentDate() {
   const now = new Date();
@@ -178,6 +202,10 @@ const requestData = () => {
   vscode.postMessage({
     command: "getChat",
   });
+
+  vscode.postMessage({
+    command: "getThemePreference",
+  });
 };
 
 requestData();
@@ -197,21 +225,19 @@ async function main() {
 
   let selectedUUID = "";
   let documentsAppendedToQuery: any[] = [];
+  const themes: string[] = ["light", "dark"];
   let queriesMade: number = 0;
 
   const sendButton = document.querySelector("#sendButton") as HTMLButtonElement;
   const userQuery: HTMLInputElement = document.querySelector(
     "#userQuery"
   ) as HTMLInputElement;
-
   const loadingIndicator: HTMLInputElement = document.querySelector(
     "#loadingIndicator"
   ) as HTMLInputElement;
-
   const closeButton: HTMLElement = document.querySelector(
     "#sideBarCloseButton"
   ) as HTMLElement;
-
   const openSidePanelBtn = document.querySelector(
     "#openSidePanelBtn"
   ) as HTMLInputElement;
@@ -327,6 +353,16 @@ async function main() {
     sendButton.removeEventListener("mouseleave", handleMouseLeave);
   };
 
+  const resetUserQuery = () => {
+    if (!userQuery || !sendButton) {
+      return;
+    }
+
+    userQuery.value = "";
+    userQuery.style.height = "28px";
+    sendButton.style.boxShadow = "";
+  };
+
   const createChatLabel = (id: string, _labelName?: string) => {
     let uuid = id;
     const chatLabel = document.createElement("div");
@@ -415,6 +451,85 @@ async function main() {
     }
   };
 
+  const setTheme = (theme: string): void => {
+    if (typeof theme !== "string") {
+      theme = "dark";
+    }
+
+    const body = document.body;
+    if (body.classList.contains(theme)) {
+      return;
+    } else {
+      themes.forEach((_theme) => {
+        body.classList.remove(_theme);
+      });
+      body.classList.add(theme.toLowerCase());
+      themeToggle.innerText =
+        theme.slice(0, 1).toUpperCase() + theme.slice(1).toLowerCase();
+    }
+  };
+
+  const openSettingsMenu = () => {
+    const settingsMenu = document.querySelector("#settingsMenu") as HTMLElement;
+    if (!settingsMenu || !conversation) {
+      return;
+    }
+    settingsMenu.style.height = "100%";
+    conversation.style.height = "0";
+  };
+
+  const closeSettingsMenu = () => {
+    const settingsMenu = document.querySelector("#settingsMenu") as HTMLElement;
+    if (!settingsMenu || !conversation) {
+      return;
+    }
+    settingsMenu.style.height = "0";
+    conversation.style.height = "100%";
+  };
+
+  const openSidePanel = () => {
+    const sidePanel = document.getElementById("sidePanel");
+    const container = document.querySelector(".container");
+    if (!sidePanel || !container) {
+      return;
+    }
+
+    sidePanel.style.width = "175px"; // Set the width of the side panel
+    sidePanel.style.paddingLeft = "20px";
+    container.classList.add("with-panel"); // Move content to the right
+    document.addEventListener("click", handleClickOutsidePanel);
+  };
+
+  const closeSidePanel = () => {
+    const sidePanel = document.getElementById("sidePanel");
+    const container = document.querySelector(".container");
+    if (!sidePanel || !container) {
+      return;
+    }
+    sidePanel.style.width = "0"; // Reset the width of the side panel
+    sidePanel.style.paddingLeft = "0";
+    container.classList.remove("with-panel"); // Move content back
+    document.removeEventListener("click", handleClickOutsidePanel);
+  };
+
+  // Function to handle clicks outside the side panel
+  const handleClickOutsidePanel = (event: Event) => {
+    const sidePanel = document.getElementById("sidePanel");
+    openSidePanelBtn;
+    console.log(event.target);
+    // Check if the click was outside the side panel and its content
+    if (
+      sidePanel &&
+      !sidePanel.contains(event.target as Node) &&
+      !openSidePanelBtn.contains(event.target as Node)
+    ) {
+      closeSidePanel();
+    }
+  };
+
+  setTheme(await ollamaThemePreference);
+
+  //Checks if key elements exist in the document.
   if (
     !userQuery ||
     !sendButton ||
@@ -506,15 +621,20 @@ async function main() {
 
   themeToggle.addEventListener("click", () => {
     const body = document.body;
+    let newTheme = "";
     if (body.classList.contains("dark")) {
       body.classList.remove("dark");
       body.classList.add("light");
+      newTheme = "light";
       themeToggle.innerText = "Light";
     } else {
       body.classList.remove("light");
       body.classList.add("dark");
+      newTheme = "dark";
       themeToggle.innerText = "Dark";
     }
+
+    vscode.postMessage({ command: "saveThemePreference", theme: newTheme });
   });
 
   userQuery.addEventListener("input", (e) => {
@@ -535,11 +655,12 @@ async function main() {
       } else if (lines >= 4 || elem.value.length > 140) {
         userQuery.style.height = "200px";
       } else {
-        userQuery.style.height = "auto";
+        userQuery.style.height = "28px";
       }
     } else {
       deactivateSendButton();
-      userQuery.style.height = "auto";
+      userQuery.style.height = "28px";
+      sendButton.style.boxShadow = "";
     }
   });
 
@@ -662,8 +783,7 @@ async function main() {
 
     loadingIndicator.style.display = "inline";
 
-    userQuery.value = "";
-    userQuery.style.height = "auto";
+    resetUserQuery();
     clearDocumentsContainer();
   }
 
@@ -961,63 +1081,5 @@ async function main() {
   };
 
   windowListener();
-
-  function openSettingsMenu() {
-    const settingsMenu = document.querySelector("#settingsMenu") as HTMLElement;
-    if (!settingsMenu || !conversation) {
-      return;
-    }
-    settingsMenu.style.height = "100%";
-    conversation.style.height = "0";
-  }
-
-  function closeSettingsMenu() {
-    const settingsMenu = document.querySelector("#settingsMenu") as HTMLElement;
-    if (!settingsMenu || !conversation) {
-      return;
-    }
-    settingsMenu.style.height = "0";
-    conversation.style.height = "100%";
-  }
-
-  function openSidePanel() {
-    const sidePanel = document.getElementById("sidePanel");
-    const container = document.querySelector(".container");
-    if (!sidePanel || !container) {
-      return;
-    }
-
-    sidePanel.style.width = "175px"; // Set the width of the side panel
-    sidePanel.style.paddingLeft = "20px";
-    container.classList.add("with-panel"); // Move content to the right
-    document.addEventListener("click", handleClickOutsidePanel);
-  }
-
-  function closeSidePanel() {
-    const sidePanel = document.getElementById("sidePanel");
-    const container = document.querySelector(".container");
-    if (!sidePanel || !container) {
-      return;
-    }
-    sidePanel.style.width = "0"; // Reset the width of the side panel
-    sidePanel.style.paddingLeft = "0";
-    container.classList.remove("with-panel"); // Move content back
-    document.removeEventListener("click", handleClickOutsidePanel);
-  }
-
-  // Function to handle clicks outside the side panel
-  function handleClickOutsidePanel(event: Event) {
-    const sidePanel = document.getElementById("sidePanel");
-    openSidePanelBtn;
-    console.log(event.target);
-    // Check if the click was outside the side panel and its content
-    if (
-      sidePanel &&
-      !sidePanel.contains(event.target as Node) &&
-      !openSidePanelBtn.contains(event.target as Node)
-    ) {
-      closeSidePanel();
-    }
-  }
 }
 main();

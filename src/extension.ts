@@ -3,13 +3,13 @@ import { llama3, defaultURLChat } from "./external/ollama";
 import { WebViewProvider } from "./providers/webViewProvider";
 import completionProvider from "./providers/completionProvider";
 import {
-  inlineSuggestionProvider,
   promptForModel,
   promptForOllamaHeaders,
   promptForOllamaURLChat,
 } from "./scripts";
 import { COMMANDS } from "./utils";
 import InlineCompletionProvider from "./providers/inlineCompletionProvider";
+import { inlineSuggestionProvider } from "./providers/inlineSuggestionsProvider";
 
 export async function activate(context: vscode.ExtensionContext) {
   const webview = new WebViewProvider(context);
@@ -210,8 +210,7 @@ export async function activate(context: vscode.ExtensionContext) {
             ollamaUrlChat,
             ollamaHeaders,
             document,
-            lineText ? lineText : undefined,
-            lineText ? position.line : undefined
+            lineText ? lineText : undefined
           );
         }
       } catch (e) {
@@ -238,11 +237,15 @@ export async function activate(context: vscode.ExtensionContext) {
           change.text.startsWith("class") ||
           change.text.endsWith("[") ||
           change.text.endsWith("]") ||
-          change.text === " " ||
+          change.text.endsWith(":") ||
           change.text.endsWith(";") || // Optional: check for semicolon
           change.text.endsWith("{") || // Optional: check for opening brace
           change.text.endsWith("}") || // Optional: check for closing brace;
-          change.text.endsWith("=") // Optional: check for equal sign;
+          change.text.endsWith("=") || // Optional: check for equal sign;
+          change.text.endsWith("for") || // Optional: check for equal sign;
+          change.text.endsWith("=>") || // Optional: check for equal sign;
+          change.text.startsWith("def") || // Optional: check for equal sign;
+          change.text.startsWith("function") // Optional: check for equal sign;
         );
       })
     ) {
