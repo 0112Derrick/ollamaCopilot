@@ -476,6 +476,7 @@ async function main() {
     }
     settingsMenu.style.height = "100%";
     conversation.style.height = "0";
+    closeSidePanel();
   };
 
   const closeSettingsMenu = () => {
