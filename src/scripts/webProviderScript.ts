@@ -2,6 +2,15 @@ import { isValidJson } from "../utils";
 import { deleteIcon, closeSvgIcon, ellipsesSvg, copySvgIcon } from "../svgs";
 import { MessageRoles } from "../providers/webViewProvider";
 import { HTML_IDS as $id } from "../constants/HTMLElementIds";
+import {
+  reviver,
+  MissingElementError,
+  createUUID,
+  addEventListenerToClass,
+  replacer,
+  isOverflown,
+} from "./utils";
+import { ChatContainer } from "./interfaces";
 
 declare function acquireVsCodeApi(): {
   postMessage: (message: any) => void;
@@ -9,37 +18,11 @@ declare function acquireVsCodeApi(): {
   setState: (newState: any) => void;
 };
 
-class MissingElementError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "Missing HTML Element";
-  }
-}
-
 const vscode = acquireVsCodeApi();
+
 let ollamaImgPromise: Promise<string>;
 let ollamaChatHistoryPromise: Promise<ChatContainer>;
 let ollamaThemePreference: Promise<string>;
-
-function replacer(key: string, value: any) {
-  if (value instanceof Map) {
-    return {
-      dataType: "Map",
-      value: Array.from(value.entries()), // Convert Map to array of key-value pairs
-    };
-  } else {
-    return value;
-  }
-}
-
-function reviver(key: string, value: any) {
-  if (typeof value === "object" && value !== null) {
-    if (value.dataType === "Map") {
-      return new Map(value.value); // Convert back to Map from array of key-value pairs
-    }
-  }
-  return value;
-}
 
 const createPromises = () => {
   let resolveImage: (value: string) => void;
@@ -98,31 +81,6 @@ const sendSignalOnLoad = () => {
 
 sendSignalOnLoad();
 
-function getCurrentDate() {
-  const now = new Date();
-
-  const year = now.getFullYear(); // 4-digit year
-  const month = String(now.getMonth() + 1).padStart(2, "0"); // 2-digit month (0-based, so +1)
-  const day = String(now.getDate()).padStart(2, "0"); // 2-digit day
-
-  return `${year}-${month}-${day}`;
-}
-
-function createUUID() {
-  let uuid = getCurrentDate() + Date.now();
-  return uuid;
-}
-
-const addEventListenerToClass = (
-  className: string,
-  eventType: string,
-  action: any
-) => {
-  document.querySelectorAll(className).forEach((elem) => {
-    elem.addEventListener(eventType, action);
-  });
-};
-
 /*  
 Re-add code container copy button
 */
@@ -139,7 +97,6 @@ function reattachEventListeners() {
     ...Array.from(_codeContainerCopyButtons),
   ];
 
-  //FIXME - Add code container to the list.
   copyButtons.forEach((button) => {
     button.addEventListener("click", (event) => {
       const parentDiv = (event.target as HTMLElement).closest(
@@ -223,17 +180,6 @@ function reattachEventListeners() {
   });
 }
 
-type ChatContainer = Map<
-  string,
-  {
-    lastUpdatedTime: number;
-    conversationHtml: string;
-    conversationLog: { role: MessageRoles; content: string }[];
-    label: string;
-    queriesMade: number;
-  }
->;
-
 const requestData = () => {
   vscode.postMessage({
     command: "requestImageUri",
@@ -285,12 +231,19 @@ async function main() {
 
   const initialConversationView = `
         <img id="ollamaImg" src=${ollamaImg} alt="Ollama"/>
-        <div class="flex suggestionsContainer">
+        <div class="suggestionsContainer">
           <div class="promptSuggestions">Code a stop watch.</div>
           <div class="promptSuggestions">List 5 projects for an intermediate developer.</div>
-          <div class="promptSuggestions">Text inviting a friend to a wedding.</div>
           <div class="promptSuggestions">Python script for daily email reports.</div>
+          <div class="promptSuggestions" data-options>Options.</div>
         </div>`;
+
+  const optionsString = `"This is additional information related to this query: Ollama copilot can help auto complete code using inline suggestions. You can highlight code and right click to use pre-created prompts for refactoring, understanding, and improving code. To switch your model use ctrl + shft + p or cmd + shft + p on mac and type ollama to view settings about switching your model, hosted machine, or setting up headers. Ollama copilot can be connected to OpenAi by setting their headers in accordance to what OpenAI expects and setting their url/model to what openAI expects. Tell the user about these capabilities. You are Ollama Copilot so talk in first person about your capabilities and do it concisely."`;
+  const options_connectingToOpenAI = `
+   Set your headers my clicking ctrl+shift+p or cmd+shift+p for mac type ollama Set Ollama Headers set it to: {"Authorization":"Bearer *Your token here*"}
+   Set your url following the same steps as before and go to Set ollama url, set the value to: https://api.openai.com/v1/chat/completions or whatever the current documentation says for connecting to OpenAi chat completions.
+   Lastly set your model following the same steps as before and set it to a chatgpt model.
+   `;
 
   const handleRecentChatClicked = (id: string) => {
     if (!conversationsContainer) {
@@ -322,18 +275,20 @@ async function main() {
   };
 
   const handleCreateConversation = () => {
-    // if (!conversation) {
-    //   return;
-    // }
     selectedUUID = createUUID();
     queriesMade = 0;
     DOM[$id.CONVERSATION].style.justifyContent = "center";
     DOM[$id.CONVERSATION].innerHTML = initialConversationView;
-    // conversation.style.justifyContent = "center";
-    // conversation.innerHTML = initialConversationView;
 
     addEventListenerToClass(".promptSuggestions", "click", (e: MouseEvent) => {
-      promptAI((e.target as HTMLDivElement).innerHTML);
+      const elem = e.target as HTMLDivElement;
+
+      if (elem.hasAttribute("data-options")) {
+        promptAI((e.target as HTMLDivElement).innerHTML, optionsString);
+      } else {
+        promptAI((e.target as HTMLDivElement).innerHTML);
+      }
+      // promptAI((e.target as HTMLDivElement).innerHTML);
     });
 
     vscode.postMessage({
@@ -405,17 +360,10 @@ async function main() {
   };
 
   const resetUserQuery = () => {
-    // if (!userQuery || !sendButton) {
-    //   return;
-    // }
-
-    // userQuery.value = "";
     (DOM[$id.SEARCH_BAR] as HTMLInputElement).value = "";
 
-    // userQuery.style.height = "28px";
-    DOM[$id.SEARCH_BAR].style.height = "28px";
+    DOM[$id.SEARCH_BAR].style.height = "";
     (DOM[$id.SEND_BUTTON] as HTMLButtonElement).style.boxShadow = "";
-    // sendButton.style.boxShadow = "";
   };
 
   const createChatLabel = (id: string, _labelName?: string) => {
@@ -629,7 +577,13 @@ async function main() {
   if (queriesMade === 0 && DOM[$id.CONVERSATION].innerHTML.trim() === "") {
     DOM[$id.CONVERSATION].innerHTML = initialConversationView;
     addEventListenerToClass(".promptSuggestions", "click", (e: MouseEvent) => {
-      promptAI((e.target as HTMLDivElement).innerHTML);
+      const elem = e.target as HTMLDivElement;
+      if (elem.hasAttribute("data-options")) {
+        promptAI((e.target as HTMLDivElement).innerHTML, optionsString);
+      } else {
+        promptAI((e.target as HTMLDivElement).innerHTML);
+      }
+      // promptAI((e.target as HTMLDivElement).innerHTML);
     });
   }
 
@@ -681,25 +635,19 @@ async function main() {
     if (!e.target) {
       return;
     }
-    let elem = e.target as HTMLInputElement;
-    if (elem.value.length > 0) {
+    let searchBar = e.target as HTMLInputElement;
+    if (searchBar.value.length > 0 && searchBar.value.trim() !== "") {
       activateSendButton();
-      const txt = elem.value.replace(/\r\n/g, "\n");
-      const lines = txt.split("\n").length;
-      console.log("\nLines: " + lines);
-      if (
-        (lines >= 2 && lines < 4) ||
-        (elem.value.length >= 70 && elem.value.length <= 140)
-      ) {
-        DOM[$id.SEARCH_BAR].style.height = "100px";
-      } else if (lines >= 4 || elem.value.length > 140) {
-        DOM[$id.SEARCH_BAR].style.height = "200px";
-      } else {
-        DOM[$id.SEARCH_BAR].style.height = "28px";
+
+      if (isOverflown(searchBar)) {
+        const currentHeight = parseInt(getComputedStyle(searchBar).height, 10);
+        // Increase height by 28px while respecting max-height in CSS
+        searchBar.style.height =
+          Math.min(currentHeight + 28, window.innerHeight * 0.25) + "px";
       }
     } else {
       deactivateSendButton();
-      DOM[$id.SEARCH_BAR].style.height = "28px";
+      DOM[$id.SEARCH_BAR].style.height = "";
       DOM[$id.SEARCH_BAR].style.boxShadow = "";
     }
   });
@@ -710,7 +658,28 @@ async function main() {
         (DOM[$id.SEARCH_BAR] as HTMLFormElement).value.trim() !== "" ||
         documentsAppendedToQuery.length
       ) {
-        promptAI((DOM[$id.SEARCH_BAR] as HTMLFormElement).value);
+        let query = (DOM[$id.SEARCH_BAR] as HTMLInputElement).value;
+        query = query.toLowerCase().trim().replace(".", "");
+        //FIXME - Add details about setting up openAI.
+        if (
+          query === "option" ||
+          query === "options" ||
+          query === "setting" ||
+          query === "settings" ||
+          query === "help" ||
+          query === "info"
+        ) {
+          promptAI(query, optionsString);
+        } else if (
+          query === "connect to chatgpt" ||
+          query === "use chatgpt" ||
+          query === "chatgpt" ||
+          query === "openai"
+        ) {
+          promptAI(query, options_connectingToOpenAI);
+        } else {
+          promptAI(query);
+        }
       }
     }
   });
@@ -762,7 +731,7 @@ async function main() {
     documentsAppendedToQuery = [];
   }
 
-  function promptAI(message: string) {
+  function promptAI(message: string, contextMessage?: string) {
     deactivateSendButton();
 
     if (queriesMade === 0) {
@@ -772,7 +741,7 @@ async function main() {
 
     queriesMade++;
 
-    let query = message;
+    let query = message + " " + contextMessage;
     let visibleMessage = message;
     if (documentsAppendedToQuery.length) {
       if (query.trim() === "") {

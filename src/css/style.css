@@ -411,7 +411,8 @@ body {
   padding: 10px;
   border-radius: 8px;
   margin: 10px, 0;
-  max-width: 80%;
+  max-width: 100%;
+  overflow-x: clip;
   position: relative;
 }
 
@@ -510,6 +511,15 @@ body {
   border: 1px solid var(--text-secondary);
 }
 
+.grid {
+  display: grid;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+}
+
 .flex {
   display: flex;
   gap: 8px;
@@ -572,6 +582,9 @@ body {
   margin: 40px 0;
   align-items: center;
   justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
 }
 
 .mb-1 {
@@ -581,12 +594,12 @@ body {
 .promptSuggestions {
   background: inherit;
   border-radius: 4px;
-  padding: 5px;
+  padding: 10px;
   cursor: pointer;
   border: 1px solid;
   border-color: var(--border-medium);
-  width: 100px;
-  height: 75px;
+  width: 130px;
+  height: 100px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -601,13 +614,13 @@ body {
   color: var(--text-primary);
   border: 0 solid var(--border-heavy);
   background-color: transparent;
-  height: 28px;
+  height: 34px;
   font-size: 1rem;
   overflow-y: hidden;
   max-height: 25dvh;
   line-height: 1.5;
   padding: 0.5rem 0.75rem;
-  margin-bottom: 0.5rem;
+  /* margin-bottom: 0.5rem; */
   outline: none;
 }
 
@@ -798,4 +811,14 @@ body {
   background: var(--main-surface-secondary);
   color: var(--red-500);
   fill: var(--red-500);
+}
+
+@media screen and (min-width: 720px) {
+  .ai-message {
+    max-width: 80%;
+  }
+
+  .suggestionsContainer {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
