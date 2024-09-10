@@ -482,6 +482,7 @@ async function main() {
     }
     settingsMenu.style.height = "100%";
     DOM[$id.CONVERSATION].style.height = "0";
+    DOM[$id.PROMPT_BAR].style.visibility = "hidden";
     // conversation.style.height = "0";
     closeSidePanel();
   };
@@ -493,6 +494,7 @@ async function main() {
     }
     settingsMenu.style.height = "0";
     DOM[$id.CONVERSATION].style.height = "100%";
+    DOM[$id.PROMPT_BAR].style.visibility = "visible";
     // conversation.style.height = "100%";
   };
 

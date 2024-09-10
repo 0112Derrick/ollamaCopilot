@@ -478,6 +478,10 @@ body {
   font-size: 16px;
 }
 
+.clipboard-icon:hover {
+  color: var(--link-hover);
+}
+
 .clipboard-icon-messages:hover {
   color: var(--link-hover);
 }
@@ -592,7 +596,8 @@ body {
 }
 
 .promptSuggestions {
-  background: inherit;
+  background: var(--main-surface-secondary);
+  color: var(--text-primary);
   border-radius: 4px;
   padding: 10px;
   cursor: pointer;

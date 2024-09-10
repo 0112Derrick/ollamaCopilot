@@ -13,6 +13,7 @@ const HTML_IDS = {
   SETTINGS_BUTTON: "settingsButton",
   SETTINGS_MENU_CLOSE_BUTTON: "settingMenuCloseButton",
   THEME_TOGGLE: "themeToggle",
+  PROMPT_BAR: "promptBar",
 };
 
 for (let prop in HTML_IDS) {
