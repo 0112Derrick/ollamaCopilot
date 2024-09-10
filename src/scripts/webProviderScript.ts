@@ -160,17 +160,55 @@ function reattachEventListeners() {
           ? userMessage.children[1].textContent
           : "";
       } else if (parentDiv.classList.contains("ai-message")) {
-        const aiMessage = parentDiv.querySelector(".flex-nowrap");
-        if (!aiMessage) {
-          return;
+        const codeContainer = parentDiv.querySelector(".code-container");
+
+        // Default case: No code-container, copy from .flex-nowrap
+        if (!codeContainer) {
+          const aiMessage = parentDiv.querySelector(".flex-nowrap");
+          if (aiMessage && aiMessage.children[1]) {
+            textToCopy = aiMessage.children[1].textContent || "";
+          }
         }
-        textToCopy = aiMessage.children[1].textContent
-          ? aiMessage.children[1].textContent
-          : "";
+
+        // Special case: AI message with code-container
+        else {
+          /* 
+          3 options:
+           Pre-code-container + code-container + post-code-container
+           Pre-code-container + code-container
+           code-container + post-code-container
+
+           -- in order to get the text from pre-code-container I need to access its inner child and select the inner child's the 2nd element.
+
+           -- in order to get the text from the code container I need to access code-container and then get the text from the pre element.
+
+           -- in order to get the text from post code container i need to get its inner html
+          */
+          const preCodeContainer = parentDiv.querySelector(
+            ".pre-code-container"
+          );
+          const codeElement = parentDiv.querySelector(".code-container pre");
+          const postCodeContainer = parentDiv.querySelector(
+            ".post-code-container"
+          );
+
+          if (preCodeContainer && preCodeContainer.children[0].children[1]) {
+            textToCopy +=
+              preCodeContainer.children[0].children[1].textContent + "\n" || "";
+          }
+
+          if (codeElement) {
+            textToCopy += codeElement.textContent + "\n" || "";
+          }
+
+          if (postCodeContainer) {
+            textToCopy += postCodeContainer.textContent + "/n" || "";
+          }
+        }
       } else if (parentDiv.classList.contains("code-container")) {
-        const code = parentDiv.children[1].innerHTML;
+        const code = parentDiv.children[1].textContent;
         console.log("code: ", code);
-        textToCopy = code;
+        textToCopy = code ? code : "";
       }
 
       navigator.clipboard
