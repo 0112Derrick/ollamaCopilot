@@ -428,7 +428,7 @@ export class WebViewProvider implements vscode.WebviewViewProvider {
       <link rel="stylesheet" href="${styleUri}" />
   </head>
   <body class="dark">
-    <div class="container">
+    <div class="container" id="container">
     <div id="sidePanel" class="side-panel">
       <a id='sideBarCloseButton' class="closebtn">&times;</a>
       <!--Container for all of the saved chats.-->

@@ -1,10 +1,21 @@
 import { isValidJson } from "../utils";
+import { deleteIcon, closeSvgIcon, ellipsesSvg, copySvgIcon } from "../svgs";
+import { MessageRoles } from "../providers/webViewProvider";
+import { HTML_IDS as $id } from "../constants/HTMLElementIds";
 
 declare function acquireVsCodeApi(): {
   postMessage: (message: any) => void;
   getState: () => any;
   setState: (newState: any) => void;
 };
+
+class MissingElementError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "Missing HTML Element";
+  }
+}
+
 const vscode = acquireVsCodeApi();
 let ollamaImgPromise: Promise<string>;
 let ollamaChatHistoryPromise: Promise<ChatContainer>;
@@ -84,6 +95,7 @@ const sendSignalOnLoad = () => {
     vscode.postMessage({ command: "webviewReady" });
   });
 };
+
 sendSignalOnLoad();
 
 function getCurrentDate() {
@@ -115,14 +127,23 @@ const addEventListenerToClass = (
 Re-add code container copy button
 */
 function reattachEventListeners() {
-  const copyButtons: NodeListOf<HTMLElement> = document.querySelectorAll(
+  const _copyButtons: NodeListOf<HTMLElement> = document.querySelectorAll(
     ".clipboard-icon-messages"
   );
 
+  const _codeContainerCopyButtons: NodeListOf<HTMLElement> =
+    document.querySelectorAll(".clipboard-icon");
+
+  const copyButtons: HTMLElement[] = [
+    ...Array.from(_copyButtons),
+    ...Array.from(_codeContainerCopyButtons),
+  ];
+
+  //FIXME - Add code container to the list.
   copyButtons.forEach((button) => {
     button.addEventListener("click", (event) => {
       const parentDiv = (event.target as HTMLElement).closest(
-        ".user-message, .ai-message"
+        ".user-message, .ai-message, .code-container"
       );
 
       if (!parentDiv) {
@@ -146,6 +167,10 @@ function reattachEventListeners() {
         textToCopy = aiMessage.children[1].textContent
           ? aiMessage.children[1].textContent
           : "";
+      } else if (parentDiv.classList.contains("code-container")) {
+        const code = parentDiv.children[1].innerHTML;
+        console.log("code: ", code);
+        textToCopy = code;
       }
 
       navigator.clipboard
@@ -160,17 +185,6 @@ function reattachEventListeners() {
   });
 }
 
-type userMessageRole = "user";
-type toolMessageRole = "tool";
-type assistantMessageRole = "assistant";
-type systemMessageRole = "system";
-
-type MessageRoles =
-  | userMessageRole
-  | toolMessageRole
-  | assistantMessageRole
-  | systemMessageRole;
-
 type ChatContainer = Map<
   string,
   {
@@ -181,18 +195,6 @@ type ChatContainer = Map<
     queriesMade: number;
   }
 >;
-
-const deleteIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0"> <path fill-rule="evenodd" clip-rule="evenodd" d="M10.5555 4C10.099 4 9.70052 4.30906 9.58693 4.75114L9.29382 5.8919H14.715L14.4219 4.75114C14.3083 4.30906 13.9098 4 13.4533 4H10.5555ZM16.7799 5.8919L16.3589 4.25342C16.0182 2.92719 14.8226 2 13.4533 2H10.5555C9.18616 2 7.99062 2.92719 7.64985 4.25342L7.22886 5.8919H4C3.44772 5.8919 3 6.33961 3 6.8919C3 7.44418 3.44772 7.8919 4 7.8919H4.10069L5.31544 19.3172C5.47763 20.8427 6.76455 22 8.29863 22H15.7014C17.2354 22 18.5224 20.8427 18.6846 19.3172L19.8993 7.8919H20C20.5523 7.8919 21 7.44418 21 6.8919C21 6.33961 20.5523 5.8919 20 5.8919H16.7799ZM17.888 7.8919H6.11196L7.30423 19.1057C7.3583 19.6142 7.78727 20 8.29863 20H15.7014C16.2127 20 16.6417 19.6142 16.6958 19.1057L17.888 7.8919ZM10 10C10.5523 10 11 10.4477 11 11V16C11 16.5523 10.5523 17 10 17C9.44772 17 9 16.5523 9 16V11C9 10.4477 9.44772 10 10 10ZM14 10C14.5523 10 15 10.4477 15 11V16C15 16.5523 14.5523 17 14 17C13.4477 17 13 16.5523 13 16V11C13 10.4477 13.4477 10 14 10Z" fill="currentColor"></path></svg>`;
-
-const ellipsesSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-md"><path fill-rule="evenodd" clip-rule="evenodd" d="M3 12C3 10.8954 3.89543 10 5 10C6.10457 10 7 10.8954 7 12C7 13.1046 6.10457 14 5 14C3.89543 14 3 13.1046 3 12ZM10 12C10 10.8954 10.8954 10 12 10C13.1046 10 14 10.8954 14 12C14 13.1046 13.1046 14 12 14C10.8954 14 10 13.1046 10 12ZM17 12C17 10.8954 17.8954 10 19 10C20.1046 10 21 10.8954 21 12C21 13.1046 20.1046 14 19 14C17.8954 14 17 13.1046 17 12Z" fill="currentColor"></path><span class="tooltiptext">Options</span></svg>`;
-
-const closeSvgIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-sm"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.63603 5.63604C6.02656 5.24552 6.65972 5.24552 7.05025 5.63604L12 10.5858L16.9497 5.63604C17.3403 5.24552 17.9734 5.24552 18.364 5.63604C18.7545 6.02657 18.7545 6.65973 18.364 7.05025L13.4142 12L18.364 16.9497C18.7545 17.3403 18.7545 17.9734 18.364 18.364C17.9734 18.7545 17.3403 18.7545 16.9497 18.364L12 13.4142L7.05025 18.364C6.65972 18.7545 6.02656 18.7545 5.63603 18.364C5.24551 17.9734 5.24551 17.3403 5.63603 16.9497L10.5858 12L5.63603 7.05025C5.24551 6.65973 5.24551 6.02657 5.63603 5.63604Z" fill="currentColor"></path></svg>`;
-
-const copySvgIcon = `<?xml version="1.0" encoding="utf-8"?>
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M6 11C6 8.17157 6 6.75736 6.87868 5.87868C7.75736 5 9.17157 5 12 5H15C17.8284 5 19.2426 5 20.1213 5.87868C21 6.75736 21 8.17157 21 11V16C21 18.8284 21 20.2426 20.1213 21.1213C19.2426 22 17.8284 22 15 22H12C9.17157 22 7.75736 22 6.87868 21.1213C6 20.2426 6 18.8284 6 16V11Z" stroke="currentColor" stroke-width="1.5"/>
-<path d="M6 19C4.34315 19 3 17.6569 3 16V10C3 6.22876 3 4.34315 4.17157 3.17157C5.34315 2 7.22876 2 11 2H15C16.6569 2 18 3.34315 18 5" stroke="currentColor" stroke-width="1.5"/>
-</svg>`;
 
 const requestData = () => {
   vscode.postMessage({
@@ -212,6 +214,8 @@ requestData();
 
 async function main() {
   const conversationsContainer: ChatContainer = await ollamaChatHistoryPromise;
+  // let DOM: HTMLElement[] = [];
+  const DOM: { [key: string]: HTMLElement } = {};
 
   console.log("Map: ", conversationsContainer);
 
@@ -227,43 +231,20 @@ async function main() {
   let documentsAppendedToQuery: any[] = [];
   const themes: string[] = ["light", "dark"];
   let queriesMade: number = 0;
+  //create html element objects using the values from the html_ids file and
 
-  const sendButton = document.querySelector("#sendButton") as HTMLButtonElement;
-  const userQuery: HTMLInputElement = document.querySelector(
-    "#userQuery"
-  ) as HTMLInputElement;
-  const loadingIndicator: HTMLInputElement = document.querySelector(
-    "#loadingIndicator"
-  ) as HTMLInputElement;
-  const closeButton: HTMLElement = document.querySelector(
-    "#sideBarCloseButton"
-  ) as HTMLElement;
-  const openSidePanelBtn = document.querySelector(
-    "#openSidePanelBtn"
-  ) as HTMLInputElement;
-  const conversation = document.querySelector(
-    "#conversation"
-  ) as HTMLInputElement;
-  const recentChatsContainer = document.querySelector(
-    "#chatsContainer"
-  ) as HTMLInputElement;
-  const documentsContainer = document.querySelector(
-    "#appendedDocumentsContainer"
-  ) as HTMLDivElement;
-  const newChatWindowButton = document.querySelector(
-    "#newChatButton"
-  ) as HTMLElement;
-  const addFileButton = document.querySelector("#addFileButton") as HTMLElement;
-  const container = document.querySelector(".container") as HTMLElement;
-  const settingsButton = document.querySelector(
-    "#settingsButton"
-  ) as HTMLElement;
-  const settingMenuCloseButton = document.querySelector(
-    "#settingMenuCloseButton"
-  ) as HTMLElement;
-  const themeToggle = document.querySelector("#themeToggle") as HTMLElement;
+  for (let elem_id in $id) {
+    let elem = document.getElementById($id[elem_id as keyof typeof $id]);
+    if (elem) {
+      let e: string = $id[elem_id as keyof typeof $id];
+      DOM[e] = elem;
+    } else {
+      throw new MissingElementError(
+        `Element id ${$id}: ${$id[elem_id as keyof typeof $id]} not found!`
+      );
+    }
+  }
 
-  // console.log("\nOllama img\n", ollamaImg);
   const initialConversationView = `
         <img id="ollamaImg" src=${ollamaImg} alt="Ollama"/>
         <div class="flex suggestionsContainer">
@@ -274,7 +255,7 @@ async function main() {
         </div>`;
 
   const handleRecentChatClicked = (id: string) => {
-    if (!conversation || !conversationsContainer) {
+    if (!conversationsContainer) {
       return;
     }
     /*
@@ -290,7 +271,8 @@ async function main() {
       if (data) {
         console.log("Data: " + JSON.stringify(data));
         console.log("Label: " + data.label);
-        conversation.innerHTML = data.conversationHtml;
+        DOM[$id.CONVERSATION].innerHTML = data.conversationHtml;
+        // conversation.innerHTML = data.conversationHtml;
         queriesMade = data.queriesMade;
         //NOTE - Update the conversation log in the app.
         vscode.postMessage({
@@ -302,13 +284,15 @@ async function main() {
   };
 
   const handleCreateConversation = () => {
-    if (!conversation) {
-      return;
-    }
+    // if (!conversation) {
+    //   return;
+    // }
     selectedUUID = createUUID();
     queriesMade = 0;
-    conversation.style.justifyContent = "center";
-    conversation.innerHTML = initialConversationView;
+    DOM[$id.CONVERSATION].style.justifyContent = "center";
+    DOM[$id.CONVERSATION].innerHTML = initialConversationView;
+    // conversation.style.justifyContent = "center";
+    // conversation.innerHTML = initialConversationView;
 
     addEventListenerToClass(".promptSuggestions", "click", (e: MouseEvent) => {
       promptAI((e.target as HTMLDivElement).innerHTML);
@@ -320,47 +304,80 @@ async function main() {
   };
 
   const handleMouseEnter = () => {
-    sendButton.style.background = "#d8d8d8";
-    sendButton.style.boxShadow = "3px 3px 5px #717171";
+    DOM[$id.SEND_BUTTON].style.background = "#d8d8d8";
+    DOM[$id.SEND_BUTTON].style.boxShadow = "3px 3px 5px #717171";
+    // sendButton.style.background = "#d8d8d8";
+    // sendButton.style.boxShadow = "3px 3px 5px #717171";
   };
 
   const handleMouseLeave = () => {
-    sendButton.style.background = "#fff";
-    sendButton.style.boxShadow = "";
+    DOM[$id.SEND_BUTTON].style.background = "#fff";
+    DOM[$id.SEND_BUTTON].style.boxShadow = "";
   };
 
   const activateSendButton = () => {
-    if (!sendButton) {
-      return;
-    }
-    sendButton.disabled = false;
-    sendButton.style.background = "#fff";
-    sendButton.style.color = "#000";
-    sendButton.style.cursor = "pointer";
-    sendButton.addEventListener("mouseenter", handleMouseEnter);
-    sendButton.addEventListener("mouseleave", handleMouseLeave);
+    // if (!sendButton) {
+    //   return;
+    // }
+
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).disabled = false;
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).style.background = "#fff";
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).style.color = "#000";
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).style.cursor = "pointer";
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).addEventListener(
+      "mouseenter",
+      handleMouseEnter
+    );
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).addEventListener(
+      "mouseleave",
+      handleMouseLeave
+    );
+
+    // sendButton.disabled = false;
+    // sendButton.style.background = "#fff";
+    // sendButton.style.color = "#000";
+    // sendButton.style.cursor = "pointer";
+    // sendButton.addEventListener("mouseenter", handleMouseEnter);
+    // sendButton.addEventListener("mouseleave", handleMouseLeave);
   };
 
   const deactivateSendButton = () => {
-    if (!sendButton) {
-      return;
-    }
-    sendButton.disabled = true;
-    sendButton.style.background = "#bebebe";
-    sendButton.style.color = "#00000027";
-    sendButton.style.cursor = "auto";
-    sendButton.removeEventListener("mouseenter", handleMouseEnter);
-    sendButton.removeEventListener("mouseleave", handleMouseLeave);
+    // if (!sendButton) {
+    //   return;
+    // }
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).disabled = true;
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).style.background = "#bebebe";
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).style.color = "#00000027";
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).style.cursor = "auto";
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).removeEventListener(
+      "mouseenter",
+      handleMouseEnter
+    );
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).removeEventListener(
+      "mouseleave",
+      handleMouseLeave
+    );
+
+    // sendButton.disabled = true;
+    // sendButton.style.background = "#bebebe";
+    // sendButton.style.color = "#00000027";
+    // sendButton.style.cursor = "auto";
+    // sendButton.removeEventListener("mouseenter", handleMouseEnter);
+    // sendButton.removeEventListener("mouseleave", handleMouseLeave);
   };
 
   const resetUserQuery = () => {
-    if (!userQuery || !sendButton) {
-      return;
-    }
+    // if (!userQuery || !sendButton) {
+    //   return;
+    // }
 
-    userQuery.value = "";
-    userQuery.style.height = "28px";
-    sendButton.style.boxShadow = "";
+    // userQuery.value = "";
+    (DOM[$id.SEARCH_BAR] as HTMLInputElement).value = "";
+
+    // userQuery.style.height = "28px";
+    DOM[$id.SEARCH_BAR].style.height = "28px";
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).style.boxShadow = "";
+    // sendButton.style.boxShadow = "";
   };
 
   const createChatLabel = (id: string, _labelName?: string) => {
@@ -406,7 +423,8 @@ async function main() {
     const deleteButton = document.createElement("button");
     deleteButton.addEventListener("click", () => {
       conversationsContainer.delete(uuid);
-      recentChatsContainer.removeChild(chatLabel);
+      DOM[$id.RECENT_CHATS_CONTAINER].removeChild(chatLabel);
+      // recentChatsContainer.removeChild(chatLabel);
       handleCreateConversation();
       console.log("Deleted " + uuid);
       //FIXME - add save
@@ -419,7 +437,7 @@ async function main() {
   };
 
   const updateConversationContainer = () => {
-    if (!conversation || !recentChatsContainer || !conversationsContainer) {
+    if (!conversationsContainer) {
       return;
     }
 
@@ -427,9 +445,11 @@ async function main() {
       if (!conversationsContainer.has(selectedUUID)) {
         console.log("Creating a new conversation log: " + selectedUUID);
         const chatLabel = createChatLabel(selectedUUID);
-        recentChatsContainer.appendChild(chatLabel);
+        DOM[$id.RECENT_CHATS_CONTAINER].appendChild(chatLabel);
+        // recentChatsContainer.appendChild(chatLabel);
+
         conversationsContainer.set(selectedUUID, {
-          conversationHtml: conversation.innerHTML,
+          conversationHtml: DOM[$id.CONVERSATION].innerHTML,
           lastUpdatedTime: Date.now(),
           label: selectedUUID,
           queriesMade: queriesMade,
@@ -440,7 +460,7 @@ async function main() {
         let data = conversationsContainer.get(selectedUUID);
         if (data) {
           conversationsContainer.set(selectedUUID, {
-            conversationHtml: conversation.innerHTML,
+            conversationHtml: DOM[$id.CONVERSATION].innerHTML,
             lastUpdatedTime: Date.now(),
             label: data.label,
             queriesMade: queriesMade,
@@ -464,28 +484,30 @@ async function main() {
         body.classList.remove(_theme);
       });
       body.classList.add(theme.toLowerCase());
-      themeToggle.innerText =
+      DOM[$id.THEME_TOGGLE].innerText =
         theme.slice(0, 1).toUpperCase() + theme.slice(1).toLowerCase();
     }
   };
 
   const openSettingsMenu = () => {
     const settingsMenu = document.querySelector("#settingsMenu") as HTMLElement;
-    if (!settingsMenu || !conversation) {
+    if (!settingsMenu) {
       return;
     }
     settingsMenu.style.height = "100%";
-    conversation.style.height = "0";
+    DOM[$id.CONVERSATION].style.height = "0";
+    // conversation.style.height = "0";
     closeSidePanel();
   };
 
   const closeSettingsMenu = () => {
     const settingsMenu = document.querySelector("#settingsMenu") as HTMLElement;
-    if (!settingsMenu || !conversation) {
+    if (!settingsMenu) {
       return;
     }
     settingsMenu.style.height = "0";
-    conversation.style.height = "100%";
+    DOM[$id.CONVERSATION].style.height = "100%";
+    // conversation.style.height = "100%";
   };
 
   const openSidePanel = () => {
@@ -516,13 +538,15 @@ async function main() {
   // Function to handle clicks outside the side panel
   const handleClickOutsidePanel = (event: Event) => {
     const sidePanel = document.getElementById("sidePanel");
-    openSidePanelBtn;
+
+    // openSidePanelBtn;
     console.log(event.target);
     // Check if the click was outside the side panel and its content
     if (
       sidePanel &&
       !sidePanel.contains(event.target as Node) &&
-      !openSidePanelBtn.contains(event.target as Node)
+      !DOM[$id.OPEN_SIDE_PANEL_BUTTON].contains(event.target as Node)
+      // !openSidePanelBtn.contains(event.target as Node)
     ) {
       closeSidePanel();
     }
@@ -530,61 +554,26 @@ async function main() {
 
   setTheme(await ollamaThemePreference);
 
-  //Checks if key elements exist in the document.
-  if (
-    !userQuery ||
-    !sendButton ||
-    !loadingIndicator ||
-    !closeButton ||
-    !openSidePanelBtn ||
-    !conversation ||
-    !recentChatsContainer ||
-    !newChatWindowButton ||
-    !addFileButton ||
-    !container ||
-    !settingsButton ||
-    !settingMenuCloseButton ||
-    !themeToggle
-  ) {
-    console.error("One or more elements are missing from the webview.");
-    console.error(` 
-    ${!userQuery ? "userQuery missing" : ""} 
-      ${!sendButton ? "sendButton missing" : ""} 
-      ${!loadingIndicator ? "loadingIndicator missing" : ""} 
-      ${!closeButton ? "closeButton missing" : ""} 
-      ${!openSidePanelBtn ? "openSidePanelBtn missing" : ""} 
-      ${!conversation ? "conversation container missing" : ""} 
-      ${!recentChatsContainer ? "recentChatsContainer missing" : ""} 
-      ${!newChatWindowButton ? "newChatWindowButton missing" : ""} 
-      ${!addFileButton ? "addFileButton missing" : ""}
-      ${!container ? "container missing" : ""}
-      ${!settingsButton ? "settingsButton missing" : ""}
-      ${!settingMenuCloseButton ? "settings close button missing" : ""}
-      ${!themeToggle ? "theme toggle missing" : ""}
-    `);
-    return;
-  }
-
   //Checks to see if conversationsContainer has any values already and uses the users previous chat to display, instead of the new chat screen.
   if (conversationsContainer && conversationsContainer.size) {
-    conversation.style.justifyContent = "flex-start";
+    DOM[$id.CONVERSATION].style.justifyContent = "flex-start";
+    //conversation.style.justifyContent = "flex-start";
     let uuid = 0;
     for (let [key, val] of conversationsContainer.entries()) {
       if (val.lastUpdatedTime > uuid) {
         uuid = val.lastUpdatedTime;
         selectedUUID = key;
       }
-
+      console.log("Label set to: " + val.label);
       const chatLabel = createChatLabel(key, val.label ? val.label : key);
-      recentChatsContainer.appendChild(chatLabel);
+      DOM[$id.RECENT_CHATS_CONTAINER].appendChild(chatLabel);
     }
 
     console.log("Setting to previous conversation: " + selectedUUID);
     const selectedConversation = conversationsContainer.get(selectedUUID);
     if (selectedConversation) {
       queriesMade = selectedConversation.queriesMade;
-      conversation.innerHTML = selectedConversation.conversationHtml;
-      //reattaches copy button event listeners.
+      DOM[$id.CONVERSATION].innerHTML = selectedConversation.conversationHtml;
       reattachEventListeners();
     }
   } else {
@@ -593,52 +582,64 @@ async function main() {
   }
 
   console.log(
-    `\nQueries made: ${queriesMade} | conversation container: ${conversation.innerHTML.trim()}`
+    `\nQueries made: ${queriesMade} | conversation container: ${DOM[
+      $id.CONVERSATION
+    ].innerHTML.trim()}`
   );
 
   //Sets html to intial conversation view and adds event listeners to the suggested prompts buttons
-  if (queriesMade === 0 && conversation.innerHTML.trim() === "") {
-    conversation.innerHTML = initialConversationView;
+  if (queriesMade === 0 && DOM[$id.CONVERSATION].innerHTML.trim() === "") {
+    DOM[$id.CONVERSATION].innerHTML = initialConversationView;
     addEventListenerToClass(".promptSuggestions", "click", (e: MouseEvent) => {
       promptAI((e.target as HTMLDivElement).innerHTML);
     });
   }
 
-  newChatWindowButton.addEventListener("click", handleCreateConversation);
+  // newChatWindowButton.addEventListener("click", handleCreateConversation);
+  DOM[$id.NEW_CHAT_WINDOW_BUTTON].addEventListener(
+    "click",
+    handleCreateConversation
+  );
 
-  addFileButton.addEventListener("click", async () => {
+  DOM[$id.ADD_FILE_BUTTON].addEventListener("click", async () => {
     vscode.postMessage({
       command: "openFileDialog",
     });
   });
 
-  settingsButton.addEventListener("click", openSettingsMenu);
+  DOM[$id.SETTINGS_BUTTON].addEventListener("click", openSettingsMenu);
 
-  settingMenuCloseButton.addEventListener("click", closeSettingsMenu);
+  DOM[$id.SETTINGS_MENU_CLOSE_BUTTON].addEventListener(
+    "click",
+    closeSettingsMenu
+  );
 
-  closeButton.addEventListener("click", closeSidePanel);
+  DOM[$id.SIDEBAR_CLOSE_BUTTON].addEventListener("click", closeSidePanel);
 
-  openSidePanelBtn.addEventListener("click", openSidePanel);
+  DOM[$id.OPEN_SIDE_PANEL_BUTTON].addEventListener("click", openSidePanel);
 
-  themeToggle.addEventListener("click", () => {
+  const switchToggle = () => {
     const body = document.body;
     let newTheme = "";
     if (body.classList.contains("dark")) {
       body.classList.remove("dark");
       body.classList.add("light");
       newTheme = "light";
-      themeToggle.innerText = "Light";
+      DOM[$id.THEME_TOGGLE].innerText = "Light";
+      // themeToggle.innerText = "Light";
     } else {
       body.classList.remove("light");
       body.classList.add("dark");
       newTheme = "dark";
-      themeToggle.innerText = "Dark";
+      DOM[$id.THEME_TOGGLE].innerText = "Dark";
+      // themeToggle.innerText = "Dark";
     }
 
     vscode.postMessage({ command: "saveThemePreference", theme: newTheme });
-  });
+  };
+  DOM[$id.THEME_TOGGLE].addEventListener("click", switchToggle);
 
-  userQuery.addEventListener("input", (e) => {
+  DOM[$id.SEARCH_BAR].addEventListener("input", (e) => {
     if (!e.target) {
       return;
     }
@@ -652,38 +653,41 @@ async function main() {
         (lines >= 2 && lines < 4) ||
         (elem.value.length >= 70 && elem.value.length <= 140)
       ) {
-        userQuery.style.height = "100px";
+        DOM[$id.SEARCH_BAR].style.height = "100px";
       } else if (lines >= 4 || elem.value.length > 140) {
-        userQuery.style.height = "200px";
+        DOM[$id.SEARCH_BAR].style.height = "200px";
       } else {
-        userQuery.style.height = "28px";
+        DOM[$id.SEARCH_BAR].style.height = "28px";
       }
     } else {
       deactivateSendButton();
-      userQuery.style.height = "28px";
-      sendButton.style.boxShadow = "";
+      DOM[$id.SEARCH_BAR].style.height = "28px";
+      DOM[$id.SEARCH_BAR].style.boxShadow = "";
     }
   });
 
-  userQuery.addEventListener("keypress", function (e) {
+  DOM[$id.SEARCH_BAR].addEventListener("keypress", function (e) {
     if (e.key === "Enter" && !e.shiftKey) {
-      if (userQuery.value.trim() !== "" || documentsAppendedToQuery.length) {
-        promptAI(userQuery.value);
+      if (
+        (DOM[$id.SEARCH_BAR] as HTMLFormElement).value.trim() !== "" ||
+        documentsAppendedToQuery.length
+      ) {
+        promptAI((DOM[$id.SEARCH_BAR] as HTMLFormElement).value);
       }
     }
   });
 
-  sendButton.addEventListener("click", () => {
-    if (userQuery.value.trim() !== "" || documentsAppendedToQuery.length) {
-      promptAI(userQuery.value);
+  DOM[$id.SEND_BUTTON].addEventListener("click", () => {
+    if (
+      (DOM[$id.SEARCH_BAR] as HTMLInputElement).value.trim() !== "" ||
+      documentsAppendedToQuery.length
+    ) {
+      promptAI((DOM[$id.SEARCH_BAR] as HTMLInputElement).value);
     }
   });
 
   function updateAppendedDocumentsUI() {
-    if (!documentsContainer) {
-      return;
-    }
-    documentsContainer.innerHTML = ""; // Clear the existing list
+    DOM[$id.APPENDED_DOCUMENTS_CONTAINER].innerHTML = ""; // Clear the existing list
 
     documentsAppendedToQuery.forEach((doc, index) => {
       const docElement = document.createElement("div");
@@ -699,7 +703,7 @@ async function main() {
         documentsAppendedToQuery.splice(index, 1); // Remove the document from the array
         updateAppendedDocumentsUI(); // Refresh the UI
         if (
-          userQuery.value.length === 0 &&
+          (DOM[$id.SEARCH_BAR] as HTMLInputElement).value.length === 0 &&
           documentsAppendedToQuery.length === 0
         ) {
           deactivateSendButton();
@@ -708,32 +712,28 @@ async function main() {
 
       docElement.appendChild(docName);
       docElement.appendChild(removeIcon);
-      documentsContainer.appendChild(docElement);
+
+      DOM[$id.APPENDED_DOCUMENTS_CONTAINER].appendChild(docElement);
     });
     activateSendButton();
   }
 
   function clearDocumentsContainer() {
-    if (!documentsContainer) {
-      return;
-    }
-    documentsContainer.innerHTML = "";
+    DOM[$id.APPENDED_DOCUMENTS_CONTAINER].innerHTML = "";
+
     documentsAppendedToQuery = [];
   }
 
   function promptAI(message: string) {
-    if (!userQuery || !loadingIndicator || !sendButton || !conversation) {
-      return;
-    }
     deactivateSendButton();
 
     if (queriesMade === 0) {
-      conversation.innerHTML = "";
-      conversation.style.justifyContent = "flex-start";
+      DOM[$id.CONVERSATION].innerHTML = "";
+      DOM[$id.CONVERSATION].style.justifyContent = "flex-start";
     }
 
     queriesMade++;
-    //userQuery.value;
+
     let query = message;
     let visibleMessage = message;
     if (documentsAppendedToQuery.length) {
@@ -782,23 +782,19 @@ async function main() {
       query: query,
     });
 
-    loadingIndicator.style.display = "inline";
+    DOM[$id.LOADING_INDICATOR].style.display = "inline";
 
     resetUserQuery();
     clearDocumentsContainer();
   }
 
   async function displayMessage(message: string, sender: string) {
-    if (!conversation) {
-      return;
-    }
     const ollamaImg = await ollamaImgPromise;
 
     const messageElement = document.createElement("div");
     messageElement.className =
       sender === "user" ? "user-message" : "ai-message clearBackground";
 
-    // messageElement.innerText = message;
     if (messageElement.className === "ai-message clearBackground") {
       messageElement.insertAdjacentHTML(
         "afterbegin",
@@ -839,17 +835,13 @@ async function main() {
     clipboardIconContainer.appendChild(clipboardIcon);
     messageOptions.appendChild(clipboardIconContainer);
     messageElement.appendChild(messageOptions);
+    DOM[$id.CONVERSATION].appendChild(messageElement);
+    DOM[$id.CONVERSATION].scrollTop = DOM[$id.CONVERSATION].scrollHeight;
 
-    conversation.appendChild(messageElement);
-    conversation.scrollTop = conversation.scrollHeight; // Scroll to the bottom
     updateConversationContainer();
   }
 
   async function parseAndDisplayResponse(aiResponse: string) {
-    if (!loadingIndicator || !conversation) {
-      return;
-    }
-
     if (typeof aiResponse !== "string") {
       vscode.postMessage({
         command: "logError",
@@ -939,8 +931,9 @@ async function main() {
       messageOptions.appendChild(clipboardIconContainer);
 
       aiMessage.appendChild(messageOptions);
-      conversation.appendChild(aiMessage);
-      conversation.scrollTop = conversation.scrollHeight; // Scroll to the bottom
+      DOM[$id.CONVERSATION].appendChild(aiMessage);
+      DOM[$id.CONVERSATION].scrollTop = DOM[$id.CONVERSATION].scrollHeight;
+
       updateConversationContainer();
     } else {
       // If no code block, display the entire response as regular text
@@ -948,7 +941,7 @@ async function main() {
     }
 
     // Hide loading indicator
-    loadingIndicator.style.display = "none";
+    DOM[$id.LOADING_INDICATOR].style.display = "none";
   }
 
   function copyToClipboard(text: string) {
@@ -1040,9 +1033,9 @@ async function main() {
                   label: message.label,
                 });
               }
-              if (recentChatsContainer) {
+              if (DOM[$id.RECENT_CHATS_CONTAINER]) {
                 // Iterate over each child of recentChatsContainer
-                const children = recentChatsContainer.children;
+                const children = DOM[$id.RECENT_CHATS_CONTAINER].children;
                 for (let i = 0; i < children.length; i++) {
                   const child = children[i] as HTMLElement;
 
@@ -1068,7 +1061,7 @@ async function main() {
           break;
         case "eraseAllChats":
           handleCreateConversation();
-          recentChatsContainer.innerHTML = "";
+          DOM[$id.RECENT_CHATS_CONTAINER].innerHTML = "";
           break;
         default:
           console.error("Unknown command:", message.command);

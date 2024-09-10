@@ -100,6 +100,8 @@ textarea {
 
 body {
   font-family: Arial, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
   background-color: var(--background-color);
   margin: 0;
   padding: 0;
@@ -503,8 +505,9 @@ body {
 
 .ollama-message-icon {
   border-radius: 50%;
-  height: 35px;
+  height: 40px;
   aspect-ratio: 1/1;
+  border: 1px solid var(--text-secondary);
 }
 
 .flex {
@@ -752,6 +755,10 @@ body {
 .labelOptions {
   position: relative; /* Position relative to use absolute positioning for the menu */
   cursor: pointer; /* Show a pointer cursor on hover */
+}
+
+.labelName {
+  font-size: small;
 }
 
 /* Hide the menu initially */
