@@ -367,34 +367,49 @@ export class WebViewProvider implements vscode.WebviewViewProvider {
           if (typeof labelResponse !== "string") {
             let labelName = message.id;
             console.log("Label response: " + JSON.stringify(labelResponse));
-            let data = "";
 
-            const lab = labelResponse.choices.at(-1);
-            let label = "";
-            if (lab) {
-              label = lab.message.content;
+            const labChoices = labelResponse.choices;
+            let label;
+            if (labChoices) {
+              const lab = labChoices.at(-1);
+              if (lab) {
+                label = lab.message.content;
+              }
             } else {
               label = labelResponse.message.content;
             }
 
             console.log(label);
+
             if (label) {
               console.log("label: " + label);
-              data = label;
-            }
-
-            if (isValidJson(data)) {
-              let obj: { label: string } = JSON.parse(data);
-              if (obj.hasOwnProperty("label")) {
-                labelName = obj.label;
+              if (isValidJson(label)) {
+                let obj: { label: string } = JSON.parse(label);
+                if (obj.hasOwnProperty("label")) {
+                  labelName = obj.label;
+                  console.log(`Label Name: ${labelName}`);
+                } else {
+                  console.log("No property label");
+                }
+              } else if (typeof label === "object") {
+                if ((label as Object).hasOwnProperty("label")) {
+                  console.log("label is an obj");
+                  labelName = (label as { label: string }).label;
+                } else {
+                  console.log("label is not an obj");
+                }
+              } else {
+                console.log(typeof label);
+                console.log("Cannot parse label name");
               }
-            }
 
-            webviewView.webview.postMessage({
-              command: "setLabelName",
-              id: message.id,
-              label: labelName,
-            });
+              console.log("Label name:", labelName);
+              webviewView.webview.postMessage({
+                command: "setLabelName",
+                id: message.id,
+                label: labelName,
+              });
+            }
           }
           break;
       }

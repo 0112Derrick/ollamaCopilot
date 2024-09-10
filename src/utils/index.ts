@@ -3,9 +3,14 @@ export function isValidJson(str: string): boolean {
     if (str.trim() === "") {
       return false;
     }
-    JSON.parse(str);
+    // Replace single quotes with double quotes, if needed
+    const normalizedStr = str.replace(/'/g, '"');
+
+    // Try to parse the normalized string
+    JSON.parse(normalizedStr);
     return true;
   } catch (e) {
+    console.log(e);
     return false;
   }
 }
