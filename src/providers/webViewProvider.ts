@@ -83,11 +83,6 @@ export class WebViewProvider implements vscode.WebviewViewProvider {
 
       await vscode.commands.executeCommand("ollamaView.focus");
       this._processMessageQueue();
-      // this._view.webview.postMessage({
-      //   command: "queryDocument",
-      //   query: message.trim(),
-      // });
-      // vscode.window.showInformationMessage("Check webview.");
     } else {
       vscode.window.showErrorMessage(
         "An error occurred: Ollama copilot is unavailable."
@@ -474,8 +469,28 @@ export class WebViewProvider implements vscode.WebviewViewProvider {
     </div>
     <div class="settingsMenu" id="settingsMenu">
     <a id='settingMenuCloseButton' class="closebtn">&times;</a>
-    <label for="themeToggle">Switch themes:</label>
-    <button id="themeToggle">Dark</button>
+    <div class="flex">
+      <div class="flex">
+        <label for="themeToggleLight">Light Theme</label>
+        <input type="radio" id="themeToggleLight" name="themeToggle" value="light" />
+      </div>
+      <div class="flex">
+        <label for="themeToggleDark">Dark Theme</label>
+        <input type="radio" id="themeToggleDark" name="themeToggle" value="dark" checked />
+      </div>
+      <div class="flex">
+        <label for="themeToggleRoseGold">Rose Gold Theme</label>
+        <input type="radio" id="themeToggleRoseGold" name="themeToggle" value="rose-gold" />
+      </div>
+      <div class="flex">
+        <label for="themeToggleHighContrast">High Contrast Theme</label>
+        <input type="radio" id="themeToggleHighContrast" name="themeToggle" value="high-contrast" />
+      </div>
+      <div class="flex">
+        <label for="themeTogglePokemonTheme">Pokémon Theme</label>
+        <input type="radio" id="themeTogglePokemonTheme" name="themeToggle" value="pokemon-theme" />
+      </div>
+    </div>
     
     <label for="user_systemPrompt">System Prompt:</label>
     <textarea id="user_systemPrompt" placeholder="System prompt"></textarea>

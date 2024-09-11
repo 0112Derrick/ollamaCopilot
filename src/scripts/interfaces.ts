@@ -9,3 +9,10 @@ export type ChatContainer = Map<
     queriesMade: number;
   }
 >;
+
+export type OllamaWebviewThemes =
+  | "light"
+  | "dark"
+  | "rose-gold"
+  | "high-contrast"
+  | "pokemon-theme";

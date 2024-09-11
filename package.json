@@ -40,21 +40,48 @@
       },
       {
         "command": "ollama-copilot.improveTheCode",
-        "title": "Offer a suggestion on how to improve this code."
+        "title": "Improve this code."
       },
       {
         "command": "ollama-copilot.refactorCode",
         "title": "Refactor this code."
       },
       {
+        "command": "ollama-copilot.designPattern",
+        "title": "What is the best design pattern for this code."
+      },
+      {
+        "command": "ollama-copilot.debugTheCode",
+        "title": "Debug this code."
+      },
+      {
         "command": "ollama-copilot.clearWebviewChats",
         "title": "Clear Webview chats."
+      },
+      {
+        "command": "ollama-copilot.writeAUnitTest",
+        "title": "Write a unit test for this function."
       }
     ],
     "menus": {
       "editor/context": [
         {
           "command": "ollama-copilot.getMoreInfo",
+          "when": "editorTextFocus",
+          "group": "3_execution"
+        },
+        {
+          "command": "ollama-copilot.writeAUnitTest",
+          "when": "editorTextFocus",
+          "group": "3_execution"
+        },
+        {
+          "command": "ollama-copilot.designPattern",
+          "when": "editorTextFocus",
+          "group": "3_execution"
+        },
+        {
+          "command": "ollama-copilot.debugTheCode",
           "when": "editorTextFocus",
           "group": "3_execution"
         },

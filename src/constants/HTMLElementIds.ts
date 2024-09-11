@@ -12,8 +12,12 @@ const HTML_IDS = {
   CONTAINER: "container",
   SETTINGS_BUTTON: "settingsButton",
   SETTINGS_MENU_CLOSE_BUTTON: "settingMenuCloseButton",
-  THEME_TOGGLE: "themeToggle",
   PROMPT_BAR: "promptBar",
+  THEME_TOGGLE_LIGHT: "themeToggleLight",
+  THEME_TOGGLE_DARK: "themeToggleDark",
+  THEME_TOGGLE_ROSE_GOLD: "themeToggleRoseGold",
+  THEME_TOGGLE_HIGH_CONTRAST: "themeToggleHighContrast",
+  THEME_TOGGLE_POKEMON_THEME: "themeTogglePokemonTheme",
 };
 
 for (let prop in HTML_IDS) {

@@ -10,7 +10,7 @@ import {
   replacer,
   isOverflown,
 } from "./utils";
-import { ChatContainer } from "./interfaces";
+import { ChatContainer, OllamaWebviewThemes } from "./interfaces";
 
 declare function acquireVsCodeApi(): {
   postMessage: (message: any) => void;
@@ -22,12 +22,12 @@ const vscode = acquireVsCodeApi();
 
 let ollamaImgPromise: Promise<string>;
 let ollamaChatHistoryPromise: Promise<ChatContainer>;
-let ollamaThemePreference: Promise<string>;
+let ollamaThemePreference: Promise<OllamaWebviewThemes>;
 
 const createPromises = () => {
   let resolveImage: (value: string) => void;
   let resolveChatHistory: (value: ChatContainer) => void;
-  let resolveThemePreference: (value: string) => void;
+  let resolveThemePreference: (value: OllamaWebviewThemes) => void;
 
   ollamaImgPromise = new Promise((resolve) => {
     resolveImage = resolve;
@@ -216,7 +216,6 @@ async function main() {
 
   let selectedUUID = "";
   let documentsAppendedToQuery: any[] = [];
-  const themes: string[] = ["light", "dark"];
   let queriesMade: number = 0;
   //create html element objects using the values from the html_ids file and
 
@@ -460,10 +459,18 @@ async function main() {
     }
   };
 
-  const setTheme = (theme: string): void => {
+  const setTheme = (theme: OllamaWebviewThemes): void => {
     if (typeof theme !== "string") {
       theme = "dark";
     }
+
+    const themes: OllamaWebviewThemes[] = [
+      "light",
+      "dark",
+      "rose-gold",
+      "high-contrast",
+      "pokemon-theme",
+    ];
 
     const body = document.body;
     if (body.classList.contains(theme)) {
@@ -473,9 +480,47 @@ async function main() {
         body.classList.remove(_theme);
       });
       body.classList.add(theme.toLowerCase());
-      DOM[$id.THEME_TOGGLE].innerText =
-        theme.slice(0, 1).toUpperCase() + theme.slice(1).toLowerCase();
     }
+
+    // Update the radio button selection
+    switch (theme) {
+      case "light":
+        (DOM[$id.THEME_TOGGLE_LIGHT] as HTMLInputElement).checked = true;
+        break;
+      case "dark":
+        (DOM[$id.THEME_TOGGLE_DARK] as HTMLInputElement).checked = true;
+        break;
+      case "rose-gold":
+        (DOM[$id.THEME_TOGGLE_ROSE_GOLD] as HTMLInputElement).checked = true;
+        break;
+      case "high-contrast":
+        (DOM[$id.THEME_TOGGLE_HIGH_CONTRAST] as HTMLInputElement).checked =
+          true;
+        break;
+      case "pokemon-theme":
+        (DOM[$id.THEME_TOGGLE_POKEMON_THEME] as HTMLInputElement).checked =
+          true;
+        break;
+      default:
+        (DOM[$id.THEME_TOGGLE_DARK] as HTMLInputElement).checked = true;
+    }
+  };
+
+  const switchToggle = () => {
+    const selectedTheme = (
+      document.querySelector(
+        'input[name="themeToggle"]:checked'
+      ) as HTMLInputElement
+    ).value.toLowerCase() as OllamaWebviewThemes;
+
+    setTheme(selectedTheme);
+
+    // Send the selected theme to the VS Code extension
+
+    vscode.postMessage({
+      command: "saveThemePreference",
+      theme: selectedTheme,
+    });
   };
 
   const openSettingsMenu = () => {
@@ -484,7 +529,8 @@ async function main() {
       return;
     }
     settingsMenu.style.height = "100%";
-    DOM[$id.CONVERSATION].style.height = "0";
+    // DOM[$id.CONVERSATION].style.height = "0";
+    DOM[$id.CONVERSATION].style.visibility = "hidden";
     DOM[$id.PROMPT_BAR].style.visibility = "hidden";
     // conversation.style.height = "0";
     closeSidePanel();
@@ -496,7 +542,9 @@ async function main() {
       return;
     }
     settingsMenu.style.height = "0";
-    DOM[$id.CONVERSATION].style.height = "100%";
+    // DOM[$id.CONVERSATION].style.height = "100%";
+    DOM[$id.CONVERSATION].style.visibility = "visible";
+
     DOM[$id.PROMPT_BAR].style.visibility = "visible";
     // conversation.style.height = "100%";
   };
@@ -624,26 +672,11 @@ async function main() {
 
   DOM[$id.OPEN_SIDE_PANEL_BUTTON].addEventListener("click", openSidePanel);
 
-  const switchToggle = () => {
-    const body = document.body;
-    let newTheme = "";
-    if (body.classList.contains("dark")) {
-      body.classList.remove("dark");
-      body.classList.add("light");
-      newTheme = "light";
-      DOM[$id.THEME_TOGGLE].innerText = "Light";
-      // themeToggle.innerText = "Light";
-    } else {
-      body.classList.remove("light");
-      body.classList.add("dark");
-      newTheme = "dark";
-      DOM[$id.THEME_TOGGLE].innerText = "Dark";
-      // themeToggle.innerText = "Dark";
-    }
-
-    vscode.postMessage({ command: "saveThemePreference", theme: newTheme });
-  };
-  DOM[$id.THEME_TOGGLE].addEventListener("click", switchToggle);
+  DOM[$id.THEME_TOGGLE_DARK].addEventListener("click", switchToggle);
+  DOM[$id.THEME_TOGGLE_LIGHT].addEventListener("click", switchToggle);
+  DOM[$id.THEME_TOGGLE_ROSE_GOLD].addEventListener("click", switchToggle);
+  DOM[$id.THEME_TOGGLE_HIGH_CONTRAST].addEventListener("click", switchToggle);
+  DOM[$id.THEME_TOGGLE_POKEMON_THEME].addEventListener("click", switchToggle);
 
   DOM[$id.SEARCH_BAR].addEventListener("input", (e) => {
     if (!e.target) {

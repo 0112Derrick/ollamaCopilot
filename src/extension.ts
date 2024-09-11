@@ -1,18 +1,21 @@
 import * as vscode from "vscode";
 import { llama3, defaultURLChat } from "./external/ollama";
 import { WebViewProvider } from "./providers/webViewProvider";
-import completionProvider from "./providers/completionProvider";
+
 import {
   promptForModel,
   promptForOllamaHeaders,
   promptForOllamaURLChat,
 } from "./scripts";
-import { COMMANDS } from "./utils";
+
 import InlineCompletionProvider from "./providers/inlineCompletionProvider";
 import { inlineSuggestionProvider } from "./providers/inlineSuggestionsProvider";
+import { getWorkSpaceId } from "./utils/workspace";
 
 export async function activate(context: vscode.ExtensionContext) {
   const webview = new WebViewProvider(context);
+
+  getWorkSpaceId();
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -40,102 +43,55 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
-    vscode.languages.registerCompletionItemProvider(
-      "*",
-      completionProvider,
-      COMMANDS.aiResponseMenuTrigger
-    )
-  );
-
-  context.subscriptions.push(
     vscode.commands.registerCommand("ollama-copilot.clearWebviewChats", () => {
       webview.clearWebviewChats();
     })
   );
 
+  const promptModelWithPreWrittenQuery = (prompt: string) => {
+    /* 
+      1. Check for selected text.
+      2. Prompt AI for more info about the text.
+      3. Push the response to the webview with the user message being more info about the selected text.
+      */
+
+    const editor = vscode.window.activeTextEditor;
+    if (editor) {
+      // Get the selected text
+      const selection = editor.selection;
+      const selectedText = editor.document.getText(selection);
+
+      if (selectedText) {
+        vscode.window.showInformationMessage(`Selected text: ${selectedText}`);
+        webview.promptAI(prompt + selectedText);
+      } else {
+        vscode.window.showInformationMessage("No text selected.");
+      }
+    } else {
+      vscode.window.showErrorMessage("No active editor found.");
+    }
+  };
+
   context.subscriptions.push(
     vscode.commands.registerCommand("ollama-copilot.getMoreInfo", () => {
-      /* 
-      1. Check for selected text.
-      2. Prompt AI for more info about the text.
-      3. Push the response to the webview with the user message being more info about the selected text.
-      */
-
-      const editor = vscode.window.activeTextEditor;
-      if (editor) {
-        // Get the selected text
-        const selection = editor.selection;
-        const selectedText = editor.document.getText(selection);
-
-        if (selectedText) {
-          vscode.window.showInformationMessage(
-            `Selected text: ${selectedText}`
-          );
-          webview.promptAI(
-            "Tell me about the following code/text: " + selectedText
-          );
-        } else {
-          vscode.window.showInformationMessage("No text selected.");
-        }
-      } else {
-        vscode.window.showErrorMessage("No active editor found.");
-      }
-    })
-  );
-
-  context.subscriptions.push(
+      promptModelWithPreWrittenQuery("Tell me about the following code/text: ");
+    }),
+    vscode.commands.registerCommand("ollama-copilot.designPattern", () => {
+      promptModelWithPreWrittenQuery(
+        "What is the best design pattern for this use case? "
+      );
+    }),
+    vscode.commands.registerCommand("ollama-copilot.writeAUnitTest", () => {
+      promptModelWithPreWrittenQuery("Write a unit tests for this function: ");
+    }),
+    vscode.commands.registerCommand("ollama-copilot.debugTheCode", () => {
+      promptModelWithPreWrittenQuery("Debug this code: ");
+    }),
     vscode.commands.registerCommand("ollama-copilot.improveTheCode", () => {
-      /* 
-      1. Check for selected text.
-      2. Prompt AI for more info about the text.
-      3. Push the response to the webview with the user message being more info about the selected text.
-      */
-
-      const editor = vscode.window.activeTextEditor;
-      if (editor) {
-        // Get the selected text
-        const selection = editor.selection;
-        const selectedText = editor.document.getText(selection);
-
-        if (selectedText) {
-          vscode.window.showInformationMessage(
-            `Selected text: ${selectedText}`
-          );
-          webview.promptAI("Improve this code: " + selectedText);
-        } else {
-          vscode.window.showInformationMessage("No text selected.");
-        }
-      } else {
-        vscode.window.showErrorMessage("No active editor found.");
-      }
-    })
-  );
-
-  context.subscriptions.push(
+      promptModelWithPreWrittenQuery("Improve this code: ");
+    }),
     vscode.commands.registerCommand("ollama-copilot.refactorCode", () => {
-      /* 
-      1. Check for selected text.
-      2. Prompt AI for more info about the text.
-      3. Push the response to the webview with the user message being more info about the selected text.
-      */
-
-      const editor = vscode.window.activeTextEditor;
-      if (editor) {
-        // Get the selected text
-        const selection = editor.selection;
-        const selectedText = editor.document.getText(selection);
-
-        if (selectedText) {
-          vscode.window.showInformationMessage(
-            `Selected text: ${selectedText}`
-          );
-          webview.promptAI("Refactor this code: " + selectedText);
-        } else {
-          vscode.window.showInformationMessage("No text selected.");
-        }
-      } else {
-        vscode.window.showErrorMessage("No active editor found.");
-      }
+      promptModelWithPreWrittenQuery("Refactor this code: ");
     })
   );
 
@@ -190,7 +146,6 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     const checkAndInsertSuggestion = async () => {
-      //ANCHOR - Check for AI commands
       try {
         const document = editor.document;
         const position = editor.selection.active;
@@ -199,20 +154,18 @@ export async function activate(context: vscode.ExtensionContext) {
         const lineText = line.text.trim();
         const languageId = document.languageId;
 
-        if (!lineText.includes(COMMANDS.aiTrigger)) {
-          if (inlineSuggestionProvider.getCodingLanguage() !== languageId) {
-            inlineSuggestionProvider.setCodingLanguage(languageId);
-          }
-
-          //ANCHOR - Check code for autocompletion areas.
-          inlineSuggestionProvider.triggerQueryAI(
-            model,
-            ollamaUrlChat,
-            ollamaHeaders,
-            document,
-            lineText ? lineText : undefined
-          );
+        if (inlineSuggestionProvider.getCodingLanguage() !== languageId) {
+          inlineSuggestionProvider.setCodingLanguage(languageId);
         }
+
+        //ANCHOR - Check code for autocompletion areas.
+        inlineSuggestionProvider.triggerQueryAI(
+          model,
+          ollamaUrlChat,
+          ollamaHeaders,
+          document,
+          lineText ? lineText : undefined
+        );
       } catch (e) {
         console.error("error: ", e);
       }

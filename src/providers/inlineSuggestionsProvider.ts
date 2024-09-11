@@ -94,6 +94,7 @@ export class inlineAiSuggestionsProvider {
     );
   }
 
+  //FIXME - Ai response is impartial when focusing on a single line of code.
   async queryAI(
     model: string,
     ollamaUrl: string,
@@ -141,9 +142,10 @@ Task:
   b. Confirm or adjust your conclusion if necessary.
 5. Provide your final answer in the "code" field.
 6. Provide proper code syntax based on the programming language.
+7. Initialize all of your variables, functions, and classes using the correct syntax.
 ${
   this.codingLanguage
-    ? `7. Code in the following language: ${this.codingLanguage}`
+    ? `8. Code in the following language: ${this.codingLanguage}`
     : ""
 }
 

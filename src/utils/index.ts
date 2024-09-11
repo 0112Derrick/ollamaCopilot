@@ -95,11 +95,3 @@ function fixJsonStructure(jsonString: string): string {
 
   return jsonString;
 }
-
-const aiTrigger = "//ai";
-export const COMMANDS = {
-  aiTrigger: aiTrigger,
-  clearSuggestionsCommand: `${aiTrigger} clear`,
-  restoreSuggestions: `${aiTrigger} restore`,
-  aiResponseMenuTrigger: "/",
-};

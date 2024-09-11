@@ -65,6 +65,9 @@ textarea {
   --link-hover: #5e83b3;
   --background-color: var(--white);
   --code-container-background-color: var(--gray-600);
+  --user-message-background: #5b5b5b;
+  --user-icon-text: var(--gray-100);
+  --icon-background: var(--main-surface-primary);
   --surface-error: #f93a37;
   --seeThroughBackground: rgba(0, 0, 0, 0.5);
 }
@@ -94,8 +97,109 @@ textarea {
   --link: #7ab7ff;
   --link-hover: #5e83b3;
   --background-color: var(--gray-900);
+  --user-message-background: #5b5b5b;
+  --user-icon-text: var(--gray-100);
+  --icon-background: var(--main-surface-primary);
   --surface-error: #f93a37;
   --seeThroughBackground: rgba(255, 255, 255, 0.5);
+}
+
+.rose-gold {
+  --composer-surface: rgba(255, 192, 203, 0.8); /* Soft rose gold background */
+  --composer-bar_mask-grace-area: 55px;
+  --main-surface-primary: #b76e79; /* Rose gold primary */
+  --main-surface-secondary: #d19fa3; /* Lighter rose gold */
+  --main-surface-tertiary: #f1c1c3; /* Soft pink */
+  --sidebar-surface-primary: #b76e79; /* Darker rose gold */
+  --sidebar-surface-secondary: #d19fa3;
+  --sidebar-surface-tertiary: #f1c1c3;
+  --text-primary: #4b2c2f; /* Darker text */
+  --text-secondary: #5e3233;
+  --text-tertiary: #b88d8f;
+  --text-quaternary: #f0d1d2;
+  --text-placeholder: rgba(75, 44, 47, 0.8); /* Text placeholder with opacity */
+  --text-error: #e60023; /* Red for errors */
+  --border-light: rgba(75, 44, 47, 0.1);
+  --border-medium: rgba(75, 44, 47, 0.15);
+  --border-heavy: rgba(75, 44, 47, 0.2);
+  --border-xheavy: rgba(75, 44, 47, 0.25);
+  --border-sharp: rgba(75, 44, 47, 0.05);
+  --code-container-background-color: #fff0f0; /* Light pink background for code */
+  --link: #ff6699; /* Rose gold link color */
+  --link-hover: #cc5177; /* Darker pink for hover */
+  --background-color: #ffe4e1; /* Rose gold background */
+  --user-message-background: var(--main-surface-secondary); /* #e9950c */
+  --user-icon-text: var(--gray-100);
+  --icon-background: var(--main-surface-primary);
+  --surface-error: #e60023;
+  --seeThroughBackground: rgba(255, 192, 203, 0.5); /* Soft pink transparent */
+}
+
+.high-contrast {
+  --composer-surface: rgba(0, 0, 0, 0.9); /* Almost black background */
+  --composer-bar_mask-grace-area: 55px;
+  --main-surface-primary: #000000; /* Black primary */
+  --main-surface-secondary: #1a1a1a; /* Dark gray secondary */
+  --main-surface-tertiary: #333333; /* Gray tertiary */
+  --sidebar-surface-primary: #000000;
+  --sidebar-surface-secondary: #1a1a1a;
+  --sidebar-surface-tertiary: #333333;
+  --text-primary: #ffffff; /* White text for contrast */
+  --text-secondary: #b3b3b3;
+  --text-tertiary: #999999;
+  --text-quaternary: #666666;
+  --text-placeholder: rgba(255, 255, 255, 0.8); /* White placeholder */
+  --text-error: #ff3333; /* Bright red for errors */
+  --border-light: rgba(255, 255, 255, 0.1);
+  --border-medium: rgba(255, 255, 255, 0.2);
+  --border-heavy: rgba(255, 255, 255, 0.3);
+  --border-xheavy: rgba(255, 255, 255, 0.4);
+  --border-sharp: rgba(255, 255, 255, 0.05);
+  --code-container-background-color: #000000; /* Black background for code */
+  --link: #ffff00; /* Yellow link for high visibility */
+  --link-hover: #cccc00; /* Darker yellow hover */
+  --background-color: #000000; /* Black background */
+  --surface-error: #ff3333; /* Bright red error surface */
+  --user-message-background: #5b5b5b;
+  --icon-background: var(--main-surface-primary);
+  --user-icon-text: var(--gray-100);
+  --seeThroughBackground: rgba(
+    255,
+    255,
+    255,
+    0.7
+  ); /* White see-through background */
+}
+
+.pokemon-theme {
+  --composer-surface: rgba(0, 117, 190, 0.8); /* Blue background with opacity */
+  --composer-bar_mask-grace-area: 55px;
+  --main-surface-primary: #0075be; /* Blue primary color */
+  --main-surface-secondary: #ff0000; /* Yellow secondary */
+  --main-surface-tertiary: #ffcc00; /* Bright red tertiary */
+  --sidebar-surface-primary: #0075be; /* Blue for sidebar */
+  --sidebar-surface-secondary: #ffcc00;
+  --sidebar-surface-tertiary: #ff0000;
+  --text-primary: #ffffff; /* White text for contrast */
+  --text-secondary: #ff0000; /* Bright red secondary text */
+  --text-tertiary: #cc0000; /* Darker red tertiary text */
+  --text-quaternary: #666666; /* Gray quaternary text */
+  --text-placeholder: rgba(255, 255, 255, 0.8); /* White placeholder text */
+  --text-error: #ff0000; /* Bright red for errors */
+  --border-light: rgba(255, 255, 255, 0.1);
+  --border-medium: rgba(255, 255, 255, 0.2);
+  --border-heavy: rgba(255, 255, 255, 0.3);
+  --border-xheavy: rgba(255, 255, 255, 0.4);
+  --border-sharp: rgba(255, 255, 255, 0.05);
+  --code-container-background-color: #0075be; /* Blue background for code containers */
+  --link: #ffcc00; /* Yellow link color */
+  --link-hover: #cc0000; /* Dark red on hover */
+  --background-color: var(--main-surface-secondary); /* Blue background */
+  --user-message-background: var(--main-surface-secondary);
+  --icon-background: var(--main-surface-secondary);
+  --user-icon-text: var(--gray-100);
+  --surface-error: #ff0000; /* Bright red error surface */
+  --seeThroughBackground: rgba(255, 0, 0, 0.5); /* Transparent red background */
 }
 
 body {
@@ -199,34 +303,6 @@ body {
   color: var(--text-secondary);
   box-shadow: 3px 3px 5px black;
 }
-
-/* html {
-  --composer-surface: hsla(0, 0%, 94%, 0.9);
-  --composer-bar_mask-grace-area: 25px;
-  --text-primary: var(--gray-950);
-  --text-secondary: #7d7d7d;
-  --text-tertiary: var(--gray-400);
-  --text-quaternary: var(--gray-300);
-  --tag-blue: #08f;
-  --tag-blue-light: #0af;
-  --text-error: #f93a37;
-  --text-placeholder: rgba(0, 0, 0, 0.7);
-  --surface-error: 249 58 55;
-  --border-light: rgba(0, 0, 0, 0.1);
-  --border-medium: rgba(0, 0, 0, 0.15);
-  --border-heavy: rgba(0, 0, 0, 0.2);
-  --border-xheavy: rgba(0, 0, 0, 0.25);
-  --border-sharp: rgb(0 0 0/5%);
-  --main-surface-primary: var(--white);
-  --main-surface-secondary: var(--gray-50);
-  --main-surface-tertiary: var(--gray-100);
-  --sidebar-surface-primary: var(--gray-50);
-  --sidebar-surface-secondary: var(--gray-100);
-  --sidebar-surface-tertiary: var(--gray-200);
-  --link: #2964aa;
-  --link-hover: #749ac8;
-  --selection: #007aff;
-} */
 
 .container {
   width: 95%;
@@ -371,13 +447,15 @@ body {
   /* align-items: center; */
   justify-items: center;
 }
+
 .userIcon {
   aspect-ratio: 1/1;
   width: 35px;
-  color: var(--text-secondary);
+  color: var(--gray-100);
+  padding: 3px;
   font-weight: 500;
   /* background: var(--blue-700); */
-  background: var(--main-surface-primary);
+  background: var(--icon-background);
   border-radius: 100%;
   display: flex;
   align-items: center;
@@ -395,7 +473,7 @@ body {
 }
 
 .userBackground {
-  background-color: #5b5b5b;
+  background-color: var(--user-message-background);
   width: max-content;
   padding: 10px;
   height: max-content;
@@ -410,7 +488,7 @@ body {
   text-align: left;
   padding: 10px;
   border-radius: 8px;
-  margin: 10px, 0;
+  margin: 10px 0;
   max-width: 100%;
   overflow-x: clip;
   position: relative;
@@ -430,7 +508,7 @@ body {
 
 .code-container {
   background-color: var(--code-container-background-color);
-  color: #fff;
+  color: var(--text-primary);
   padding: 10px;
   border-radius: 4px;
   position: relative;
@@ -446,7 +524,7 @@ body {
 }
 
 .code-container .clipboard-icon {
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .message-options {
