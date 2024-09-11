@@ -267,6 +267,7 @@ async function main() {
         DOM[$id.CONVERSATION].innerHTML = data.conversationHtml;
 
         queriesMade = data.queriesMade;
+        selectedUUID = id;
         //NOTE - Update the conversation log in the app.
         vscode.postMessage({
           command: "setChatHistory",
