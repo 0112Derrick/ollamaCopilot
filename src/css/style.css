@@ -476,6 +476,7 @@ body {
   cursor: pointer;
   color: var(--text-secondary);
   font-size: 16px;
+  padding: 5px 0;
 }
 
 .clipboard-icon:hover {

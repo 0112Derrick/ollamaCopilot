@@ -598,7 +598,6 @@ async function main() {
       } else {
         promptAI((e.target as HTMLDivElement).innerHTML);
       }
-      // promptAI((e.target as HTMLDivElement).innerHTML);
     });
   }
 
@@ -676,7 +675,7 @@ async function main() {
         const originalQuery = (DOM[$id.SEARCH_BAR] as HTMLInputElement).value;
         let query = originalQuery;
         query = query.toLowerCase().trim().replace(".", "");
-        //FIXME - Add details about setting up openAI.
+        //FIXME - Add details for setting up model AI assistant if no response detected.
         if (
           query === "option" ||
           query === "options" ||
@@ -864,7 +863,7 @@ async function main() {
     updateConversationContainer();
   }
 
-  async function parseAndDisplayResponse(aiResponse: string) {
+  /* async function parseAndDisplayResponse(aiResponse: string) {
     if (typeof aiResponse !== "string") {
       vscode.postMessage({
         command: "logError",
@@ -965,6 +964,94 @@ async function main() {
 
     // Hide loading indicator
     DOM[$id.LOADING_INDICATOR].style.display = "none";
+  } */
+
+  function parseAIResponse(aiResponse: string) {
+    if (typeof aiResponse !== "string") {
+      vscode.postMessage({
+        command: "logError",
+        text: `Invalid response message: \nReceived:${typeof aiResponse} | Expected a string.`,
+      });
+      return;
+    }
+
+    const aiMessage = document.createElement("div");
+    aiMessage.className = "ai-message";
+
+    // Split the response by code blocks
+    const parts = aiResponse.split(/```(?:[\w-]+)?\n?/);
+
+    if (parts.length > 1) {
+      parts.forEach((part, index) => {
+        if (index % 2 === 0) {
+          // Text content
+          if (part.trim()) {
+            const textContainer = document.createElement("div");
+            textContainer.className = "text-container";
+            textContainer.innerText = part.trim();
+            aiMessage.appendChild(textContainer);
+          }
+        } else {
+          // Code content
+          const codeContainer = document.createElement("div");
+          codeContainer.className = "code-container";
+
+          const clipboardIcon = document.createElement("span");
+          clipboardIcon.className = "clipboard-icon";
+          clipboardIcon.innerHTML = copySvgIcon;
+          clipboardIcon.onclick = () => copyToClipboard(part.trim());
+
+          const codeBlock = document.createElement("pre");
+          codeBlock.innerText = `\n${part.trim()}`;
+
+          codeContainer.appendChild(clipboardIcon);
+          codeContainer.appendChild(codeBlock);
+          aiMessage.appendChild(codeContainer);
+        }
+      });
+
+      // Add message options (copy entire message functionality)
+      const messageOptions = createMessageOptions(aiMessage);
+      aiMessage.appendChild(messageOptions);
+
+      DOM[$id.CONVERSATION].appendChild(aiMessage);
+      DOM[$id.CONVERSATION].scrollTop = DOM[$id.CONVERSATION].scrollHeight;
+
+      updateConversationContainer();
+    } else {
+      // If no code block, display the entire response as regular text
+      displayMessage(aiResponse, "ai");
+    }
+
+    // Hide loading indicator
+    DOM[$id.LOADING_INDICATOR].style.display = "none";
+  }
+
+  function createMessageOptions(aiMessage: HTMLDivElement) {
+    const clipboardIconContainer = document.createElement("div");
+    clipboardIconContainer.className = "clipboard-icon-container tooltip";
+    clipboardIconContainer.onclick = () => {
+      copyToClipboard(
+        aiMessage.innerText.replaceAll(copySvgIcon, "").replace("Copy", "")
+      );
+    };
+
+    const toolTipCopyMessage = document.createElement("span");
+    toolTipCopyMessage.className = "tooltiptext";
+    toolTipCopyMessage.innerHTML = "Copy";
+    clipboardIconContainer.appendChild(toolTipCopyMessage);
+
+    const clipboardIcon = document.createElement("span");
+    clipboardIcon.className = "clipboard-icon-messages";
+    clipboardIcon.innerHTML = copySvgIcon;
+
+    clipboardIconContainer.appendChild(clipboardIcon);
+
+    const messageOptions = document.createElement("div");
+    messageOptions.className = "message-options";
+    messageOptions.appendChild(clipboardIconContainer);
+
+    return messageOptions;
   }
 
   function copyToClipboard(text: string) {
@@ -996,7 +1083,8 @@ async function main() {
       // console.log(JSON.stringify(message));
       switch (message.command) {
         case "displayResponse":
-          parseAndDisplayResponse(message.response);
+          // parseAndDisplayResponse(message.response);
+          parseAIResponse(message.response);
           break;
         case "fileSelected":
           const fileName = message.fileName;
