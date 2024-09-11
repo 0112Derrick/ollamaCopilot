@@ -11,7 +11,8 @@ import {
   clipSvgIcon,
   closeSvgIcon,
 } from "../svgs";
-import { isValidJson } from "../utils";
+import { isValidJson, locateJsonError } from "../utils";
+import { reviver } from "../scripts/utils";
 
 type userMessageRole = "user";
 type toolMessageRole = "tool";
@@ -262,6 +263,7 @@ export class WebViewProvider implements vscode.WebviewViewProvider {
               this.chatHistoryStorageKey,
               message.data
             );
+            console.log("Save chat history complete.");
           }
           break;
         case "deleteChatHistory":
@@ -272,6 +274,7 @@ export class WebViewProvider implements vscode.WebviewViewProvider {
             this.chatHistoryStorageKey,
             ""
           );
+          locateJsonError(chatHistoryData);
           if (chatHistoryData && isValidJson(chatHistoryData)) {
             // console.log(
             //   "Chat history state sent to webview: ",
@@ -383,32 +386,37 @@ export class WebViewProvider implements vscode.WebviewViewProvider {
 
             if (label) {
               console.log("label: " + label);
-              if (isValidJson(label)) {
-                let obj: { label: string } = JSON.parse(label);
-                if (obj.hasOwnProperty("label")) {
-                  labelName = obj.label;
-                  console.log(`Label Name: ${labelName}`);
+              try {
+                if (isValidJson(label)) {
+                  const normalizedLabel = label.replace(/'/g, '"');
+                  let obj: { label: string } = JSON.parse(normalizedLabel);
+                  if (obj.hasOwnProperty("label")) {
+                    labelName = obj.label;
+                    console.log(`Label Name: ${labelName}`);
+                  } else {
+                    console.log("No property label");
+                  }
+                } else if (typeof label === "object") {
+                  if ((label as Object).hasOwnProperty("label")) {
+                    console.log("label is an obj");
+                    labelName = (label as { label: string }).label;
+                  } else {
+                    console.log("label is not an obj");
+                  }
                 } else {
-                  console.log("No property label");
+                  console.log(typeof label);
+                  console.log("Cannot parse label name");
                 }
-              } else if (typeof label === "object") {
-                if ((label as Object).hasOwnProperty("label")) {
-                  console.log("label is an obj");
-                  labelName = (label as { label: string }).label;
-                } else {
-                  console.log("label is not an obj");
-                }
-              } else {
-                console.log(typeof label);
-                console.log("Cannot parse label name");
-              }
 
-              console.log("Label name:", labelName);
-              webviewView.webview.postMessage({
-                command: "setLabelName",
-                id: message.id,
-                label: labelName,
-              });
+                console.log("Label name:", labelName);
+                webviewView.webview.postMessage({
+                  command: "setLabelName",
+                  id: message.id,
+                  label: labelName,
+                });
+              } catch (e) {
+                console.error("Error parsing label name: " + e);
+              }
             }
           }
           break;

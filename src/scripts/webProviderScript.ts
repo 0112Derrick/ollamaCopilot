@@ -51,6 +51,8 @@ const createPromises = () => {
         resolveImage(message.imageUri);
         break;
       case "setChatHistory":
+        try {
+        } catch (e) {}
         if (isValidJson(message.data)) {
           resolveChatHistory(JSON.parse(message.data, reviver));
         } else {
@@ -201,7 +203,8 @@ async function main() {
   // let DOM: HTMLElement[] = [];
   const DOM: { [key: string]: HTMLElement } = {};
 
-  console.log("Map: ", conversationsContainer);
+  // console.log("Map: ", conversationsContainer);
+  console.log("Conversation container size: " + conversationsContainer.size);
 
   if (!conversationsContainer) {
     console.warn("Conversation container failed to resolve.");
@@ -209,7 +212,7 @@ async function main() {
   }
 
   const ollamaImg = await ollamaImgPromise;
-  console.log(`\nImg: , ${ollamaImg}\n`);
+  // console.log(`\nImg: , ${ollamaImg}\n`);
 
   let selectedUUID = "";
   let documentsAppendedToQuery: any[] = [];
@@ -255,15 +258,14 @@ async function main() {
     Set queriesMade
     */
     if (id !== selectedUUID) {
-      console.log("Clicked");
-      console.log("selected uuid: ", id);
+      // console.log("selected uuid: ", id);
       let data = conversationsContainer.get(id);
-      console.log("conversation container: ", conversationsContainer);
+      // console.log("conversation container: ", conversationsContainer);
       if (data) {
         console.log("Data: " + JSON.stringify(data));
         console.log("Label: " + data.label);
         DOM[$id.CONVERSATION].innerHTML = data.conversationHtml;
-        // conversation.innerHTML = data.conversationHtml;
+
         queriesMade = data.queriesMade;
         //NOTE - Update the conversation log in the app.
         vscode.postMessage({
@@ -413,7 +415,7 @@ async function main() {
       // recentChatsContainer.removeChild(chatLabel);
       handleCreateConversation();
       console.log("Deleted " + uuid);
-      //FIXME - add save
+      saveData();
     });
     deleteButton.innerHTML = `<div class="flex-nowrap justifyCenter itemsCenter">${deleteIcon} Delete</div>`;
     menu.appendChild(deleteButton);
@@ -528,7 +530,7 @@ async function main() {
     const sidePanel = document.getElementById("sidePanel");
 
     // openSidePanelBtn;
-    console.log(event.target);
+    // console.log(event.target);
     // Check if the click was outside the side panel and its content
     if (
       sidePanel &&
@@ -538,6 +540,16 @@ async function main() {
     ) {
       closeSidePanel();
     }
+  };
+
+  const saveData = (): void => {
+    const saveData = JSON.stringify(conversationsContainer, replacer);
+    console.log("Saving chat history.");
+    vscode.postMessage({
+      command: "saveChat",
+      data: saveData,
+    });
+    return;
   };
 
   setTheme(await ollamaThemePreference);
@@ -569,11 +581,11 @@ async function main() {
     console.log("No previous conversations");
   }
 
-  console.log(
+  /* console.log(
     `\nQueries made: ${queriesMade} | conversation container: ${DOM[
       $id.CONVERSATION
     ].innerHTML.trim()}`
-  );
+  ); */
 
   //Sets html to intial conversation view and adds event listeners to the suggested prompts buttons
   if (queriesMade === 0 && DOM[$id.CONVERSATION].innerHTML.trim() === "") {
@@ -660,7 +672,8 @@ async function main() {
         (DOM[$id.SEARCH_BAR] as HTMLFormElement).value.trim() !== "" ||
         documentsAppendedToQuery.length
       ) {
-        let query = (DOM[$id.SEARCH_BAR] as HTMLInputElement).value;
+        const originalQuery = (DOM[$id.SEARCH_BAR] as HTMLInputElement).value;
+        let query = originalQuery;
         query = query.toLowerCase().trim().replace(".", "");
         //FIXME - Add details about setting up openAI.
         if (
@@ -680,7 +693,7 @@ async function main() {
         ) {
           promptAI(query, options_connectingToOpenAI);
         } else {
-          promptAI(query);
+          promptAI(originalQuery);
         }
       }
     }
@@ -859,7 +872,7 @@ async function main() {
 
       return;
     }
-
+    //FIXME - update this function to parse multiple code container blocks.
     // Regular expression to match back ticks
 
     const codeRegex = /([\s\S]*?)```([\s\S]*?)```([\s\S]*)/;
@@ -1016,12 +1029,7 @@ async function main() {
             "Conversation container pre save: ",
             conversationsContainer
           );
-          let saveData = JSON.stringify(conversationsContainer, replacer);
-          console.log("Saving chat history: " + saveData);
-          vscode.postMessage({
-            command: "saveChat",
-            data: saveData,
-          });
+          saveData();
           break;
         case "logError":
           vscode.postMessage({
