@@ -692,6 +692,14 @@ async function main() {
         searchBar.style.height =
           Math.min(currentHeight + 28, window.innerHeight * 0.25) + "px";
       }
+      if (
+        parseInt(getComputedStyle(searchBar).height, 10) >
+        window.innerHeight * 0.24
+      ) {
+        searchBar.style.overflowY = "scroll";
+      } else {
+        searchBar.style.overflowY = "";
+      }
     } else {
       deactivateSendButton();
       DOM[$id.SEARCH_BAR].style.height = "";

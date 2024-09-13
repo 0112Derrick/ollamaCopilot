@@ -4,20 +4,7 @@ import { MessageRoles } from "../providers/webViewProvider";
 import * as vscode from "vscode";
 import { generateChatCompletion } from "../external/ollama";
 import { removeDuplicateCode } from "../scripts";
-
-interface ModelResponse {
-  model: string;
-  created_at: string;
-  message: { role: string; content: string };
-  done_reason: string;
-  done: boolean;
-  total_duration: number;
-  load_duration: number;
-  prompt_eval_count: number;
-  prompt_eval_duration: number;
-  eval_count: number;
-  eval_duration: number;
-}
+import { VectorDatabase } from "../scripts/interfaces";
 
 export class inlineAiSuggestionsProvider {
   // private _lastCheckTime = 0;
@@ -25,6 +12,10 @@ export class inlineAiSuggestionsProvider {
   private debounceTimer: NodeJS.Timeout | null = null;
   private debounceDelay = 3000; // 3 second delay
   private retryAttempts = 3;
+  private vectorDatabase: VectorDatabase;
+  constructor(db: VectorDatabase) {
+    this.vectorDatabase = db;
+  }
 
   setCodingLanguage(language: string) {
     this.codingLanguage = language;
@@ -141,8 +132,8 @@ Task:
   a. Check for potential errors or oversights.
   b. Confirm or adjust your conclusion if necessary.
 5. Provide your final answer in the "code" field.
-6. Provide proper code syntax based on the programming language.
-7. Initialize all of your variables, functions, and classes using the correct syntax.
+6. Initialize all of your variables, functions, and classes using the correct syntax.
+7. Provide complete code with initializers, typings(if necessary), and assignment operators. Do not only partially fill in the users text.
 ${
   this.codingLanguage
     ? `8. Code in the following language: ${this.codingLanguage}`
@@ -159,10 +150,21 @@ Rules:
 - For code autocompletion, provide only the next logical part, not repeating existing code.
 - Ensure the response is valid JSON.
 - Do not repeat any code that was provided.
-- Do not include any text outside the JSON object.`;
+- Do not include any text outside the JSON object.
+- Provide complete answers.
+`;
+
       chatHistory.push({
         role: "user",
         content: query,
+      });
+
+      const similarQueries = await this.vectorDatabase.getSimilarQueries(
+        focusedLine
+      );
+      chatHistory.push({
+        role: "user",
+        content: `Here are similar queries. Use these queries in order to help you solve the users current query. ${similarQueries}`,
       });
     } else {
       const query = `Analyze the following code and respond ONLY with a JSON object. Do not include any explanation or comments.
@@ -218,10 +220,6 @@ Rules:
           chatHistory
         );
 
-        // console.log(
-        //   `\npre-parse response: ${response}  type: ${typeof response}\n`
-        // );
-
         if (
           (typeof response === "string" && response.trim() !== "") ||
           typeof response === "string"
@@ -229,9 +227,6 @@ Rules:
           console.log(
             "Received type of string and expected an Object.: " + response
           );
-          // vscode.window.showErrorMessage(
-          //   "Received type of string and expected an Object.: " + response
-          // );
         }
 
         if (typeof response !== "string") {
@@ -290,7 +285,8 @@ Rules:
       console.log("Ai response: " + aiResponse.code);
       const uniqueAiResponse = removeDuplicateCode(
         aiResponse.code,
-        document.getText()
+        document.getText(),
+        focusedLine ? focusedLine : ""
       );
 
       inlineCompletionProvider.setInlineSuggestion(uniqueAiResponse);
@@ -300,5 +296,3 @@ Rules:
     }
   }
 }
-
-export const inlineSuggestionProvider = new inlineAiSuggestionsProvider();

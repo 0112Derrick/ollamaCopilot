@@ -1,4 +1,6 @@
 const esbuild = require("esbuild");
+const fs = require("fs-extra");
+const path = require("path");
 
 const production = process.argv.includes("--production");
 const watch = process.argv.includes("--watch");
@@ -8,7 +10,6 @@ const watch = process.argv.includes("--watch");
  */
 const esbuildProblemMatcherPlugin = {
   name: "esbuild-problem-matcher",
-
   setup(build) {
     build.onStart(() => {
       console.log("[watch] build started");
@@ -25,6 +26,27 @@ const esbuildProblemMatcherPlugin = {
   },
 };
 
+/**
+ * @type {import('esbuild').Plugin}
+ */
+const copyGpt3EncoderFiles = {
+  name: "copy-gpt3-encoder-files",
+  setup(build) {
+    build.onEnd(() => {
+      const sourceDir = path.join(__dirname, "node_modules", "gpt-3-encoder");
+      const targetDir = path.join(__dirname, "dist");
+
+      ["encoder.json", "vocab.bpe"].forEach((file) => {
+        fs.copySync(path.join(sourceDir, file), path.join(targetDir, file), {
+          overwrite: true,
+        });
+      });
+
+      console.log("Copied gpt-3-encoder files to dist directory");
+    });
+  },
+};
+
 async function main() {
   const ctx = await esbuild.context({
     entryPoints: ["src/**/*.ts"],
@@ -37,11 +59,9 @@ async function main() {
     outdir: "dist",
     external: ["vscode", "process", "fs", "path"],
     logLevel: "silent",
-    plugins: [
-      /* add to the end of plugins array */
-      esbuildProblemMatcherPlugin,
-    ],
+    plugins: [esbuildProblemMatcherPlugin, copyGpt3EncoderFiles],
   });
+
   if (watch) {
     await ctx.watch();
   } else {
