@@ -12,8 +12,8 @@ export class inlineAiSuggestionsProvider {
   private debounceTimer: NodeJS.Timeout | null = null;
   private debounceDelay = 3000; // 3 second delay
   private retryAttempts = 3;
-  private vectorDatabase: VectorDatabase;
-  constructor(db: VectorDatabase) {
+  private vectorDatabase: VectorDatabase | null;
+  constructor(db: VectorDatabase | null) {
     this.vectorDatabase = db;
   }
 
@@ -158,14 +158,15 @@ Rules:
         role: "user",
         content: query,
       });
-
-      const similarQueries = await this.vectorDatabase.getSimilarQueries(
-        focusedLine
-      );
-      chatHistory.push({
-        role: "user",
-        content: `Here are similar queries. Use these queries in order to help you solve the users current query. ${similarQueries}`,
-      });
+      if (this.vectorDatabase) {
+        const similarQueries = await this.vectorDatabase.getSimilarQueries(
+          focusedLine
+        );
+        chatHistory.push({
+          role: "user",
+          content: `Here are similar queries. Use these queries in order to help you solve the users current query. ${similarQueries}`,
+        });
+      }
     } else {
       const query = `Analyze the following code and respond ONLY with a JSON object. Do not include any explanation or comments.
 

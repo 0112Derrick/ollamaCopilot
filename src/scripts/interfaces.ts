@@ -1,3 +1,4 @@
+import { IndexItem } from "vectra/lib/types";
 import { MessageRoles } from "../providers/webViewProvider";
 export type ChatContainer = Map<
   string,
@@ -22,6 +23,15 @@ export type VectorDatabase = {
     query: string,
     minMatch?: number | undefined
   ) => Promise<string>;
+  addItemToVectorStore: (
+    fileContent: string,
+    filePath?: string
+  ) => Promise<void>;
+  saveWorkspace: () => Promise<{
+    version: number;
+    metadata_config: {};
+    items: IndexItem[];
+  }>;
 };
 
 export interface ModelResponse {

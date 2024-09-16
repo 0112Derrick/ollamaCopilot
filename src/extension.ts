@@ -17,24 +17,216 @@ import { inlineAiSuggestionsProvider } from "./providers/inlineSuggestionsProvid
 import { analyzeWorkspaceDocuments, getWorkSpaceId } from "./utils/workspace";
 import { LOCAL_STORAGE_KEYS as $keys } from "./constants/LocalStorageKeys";
 import VectraDB from "./db/vectorDB";
+import path from "path";
+import { VectorDatabase } from "./scripts/interfaces";
 
 export async function activate(context: vscode.ExtensionContext) {
   try {
-    console.log("Initializing VectraDB...");
-    const vectorDB = new VectraDB(context);
-
-    console.log("Creating index...");
-    await vectorDB.createIndex();
-
-    const webview = new WebViewProvider(context, vectorDB);
-    const indexData: string | undefined = await context.workspaceState.get(
-      $keys.VECTOR_DATABASE_KEY
+    const model = context.globalState.get<string>($keys.OLLAMA_MODEL);
+    const ollamaUrlChatCompletion = context.globalState.get<string>(
+      $keys.OLLAMA_CHAT_COMPLETION_URL
     );
+    const ollamaEmbedURL = context.globalState.get($keys.OLLAMA_EMBED_URL);
+    const ollamaEmbedModel = context.globalState.get($keys.OLLAMA_EMBED_MODEL);
 
-    console.log("Workspace saved vector data: ", indexData);
+    //detect if the user has a model setup.
+    if (model === undefined || ollamaUrlChatCompletion === undefined) {
+      await setupOllama(context);
+    }
+
+    //FIXME - Vector database query does not work if the file is cleared and then reloaded.
+
+    console.log("Initializing VectraDB...");
+    let vectorDB: VectraDB | null = null;
+
+    if (ollamaEmbedURL && ollamaEmbedModel) {
+      vectorDB = new VectraDB(context);
+      console.log("Creating index...");
+
+      await vectorDB.createIndex();
+
+      const indexData: string | undefined = await context.workspaceState.get(
+        $keys.VECTOR_DATABASE_KEY
+      );
+
+      // console.log("Workspace saved vector data: ", indexData);
+
+      if (!indexData) {
+        vscode.window.showInformationMessage("Embedding data.");
+        await vectorDB.indexWorkspaceDocuments();
+        saveVectorDBToWorkspaceState();
+
+        const documents = await analyzeWorkspaceDocuments();
+        if (documents) {
+          context.workspaceState.update(
+            $keys.WORKSPACE_DOCUMENTS_KEY,
+            JSON.stringify(documents)
+          );
+        }
+      } else {
+        await vectorDB.clearIndex();
+        let data = JSON.parse(indexData);
+        vscode.window.showInformationMessage("Loaded embedded data.");
+        vectorDB.loadWorkSpace(data);
+      }
+
+      const fileRenameListener = vscode.workspace.onDidRenameFiles(
+        async (event) => {
+          console.log(
+            "New file name: ",
+            event.files[0].newUri.fsPath,
+            " Prev name: ",
+            event.files[0].oldUri.fsPath
+          );
+          if (!vectorDB) {
+            return;
+          }
+          const vectors = await vectorDB.saveWorkspace();
+          if (!vectors) {
+            return;
+          }
+          const updatedVectors = vectors.items.map((vect) => {
+            if (vect.metadata.filePath === event.files[0].oldUri.fsPath) {
+              console.log(
+                "Updating filepaths in vector database: ",
+                vect.metadata.filePath
+              );
+              vect.metadata.filePath = event.files[0].newUri.fsPath;
+              console.log(
+                "Changed filepaths to: ",
+                event.files[0].newUri.fsPath
+              );
+            }
+            return vect;
+          });
+
+          const result = await vectorDB.updateItems(updatedVectors);
+          result
+            ? vscode.window.showInformationMessage(
+                "Successfully updated vectors matching changed filename."
+              )
+            : vscode.window.showErrorMessage(
+                "Unable to update vectors matching changed filename."
+              );
+        }
+      );
+
+      const workspaceChangeListener =
+        vscode.workspace.onDidChangeWorkspaceFolders(async (event) => {
+          if (!vectorDB) {
+            return;
+          }
+          vectorDB.clearIndex();
+
+          console.log("Creating index...");
+          await vectorDB.createIndex();
+
+          const indexData: string | undefined =
+            await context.workspaceState.get($keys.VECTOR_DATABASE_KEY);
+
+          console.log("Workspace saved vector data: ", indexData);
+
+          if (!indexData) {
+            await vectorDB.indexWorkspaceDocuments();
+            saveVectorDBToWorkspaceState();
+
+            const documents = await analyzeWorkspaceDocuments();
+            if (documents) {
+              context.workspaceState.update(
+                $keys.WORKSPACE_DOCUMENTS_KEY,
+                JSON.stringify(documents)
+              );
+            }
+          } else {
+            await vectorDB.clearIndex();
+            let data = JSON.parse(indexData);
+            vectorDB.loadWorkSpace(data);
+          }
+        });
+
+      // Listen for file creation
+      const fileCreationListener = vscode.workspace.onDidCreateFiles(
+        async (event) => {
+          for (const file of event.files) {
+            try {
+              if (!vectorDB) {
+                return;
+              }
+              // Read the content of the newly created file
+              const fileContent = await fs.readFile(file.fsPath, "utf8");
+
+              // Count the number of lines
+              const lineCount = fileContent.split("\n").length;
+
+              // Show line count information
+              vscode.window.showInformationMessage(
+                `Embedding new file: ${file.fsPath}.`
+              );
+
+              console.log(
+                `File created at path: ${file.fsPath} with ${lineCount} lines.`
+              );
+
+              vectorDB.addItemToVectorStore(fileContent, file.fsPath);
+
+              saveVectorDBToWorkspaceState();
+            } catch (error) {
+              vscode.window.showErrorMessage(
+                `Error reading file ${file.fsPath}: ${error}`
+              );
+              console.error(`Error reading file ${file.fsPath}:`, error);
+            }
+          }
+        }
+      );
+
+      //Listen for file deletion
+      const fileDeletionListener = vscode.workspace.onDidDeleteFiles(
+        (event) => {
+          event.files.forEach(async (file) => {
+            if (!vectorDB) {
+              return;
+            }
+            vscode.window.showInformationMessage(
+              `File deleted: ${file.fsPath}`
+            );
+
+            console.log(`File deleted at path: ${file.fsPath}`);
+
+            const vector = await vectorDB.saveWorkspace();
+            if (!vector) {
+              return;
+            }
+
+            if (vector && vector.items) {
+              console.log("Initial len: ", vector.items.length);
+              const updatedVectors = vector.items.filter((vector) => {
+                return vector.metadata.filePath !== file.fsPath; // Return boolean
+              });
+              console.log("Final len: ", updatedVectors.length);
+
+              vectorDB.updateItems(updatedVectors);
+
+              saveVectorDBToWorkspaceState();
+            }
+          });
+        }
+      );
+
+      context.subscriptions.push(
+        fileCreationListener,
+        fileDeletionListener,
+        fileRenameListener,
+        workspaceChangeListener
+      );
+    }
 
     async function saveVectorDBToWorkspaceState() {
-      const data = vectorDB.readEmbeddingsFile();
+      if (!vectorDB) {
+        return;
+      }
+
+      const data = await vectorDB.saveWorkspace();
       if (data) {
         await context.workspaceState.update(
           $keys.VECTOR_DATABASE_KEY,
@@ -46,81 +238,15 @@ export async function activate(context: vscode.ExtensionContext) {
       }
     }
 
-    if (!indexData) {
-      await vectorDB.indexWorkspaceDocuments();
-      saveVectorDBToWorkspaceState();
-    } else {
-      vectorDB.clearEmbeddingsFile();
-      let data = JSON.parse(indexData);
-      vectorDB.writeEmbeddingsFile(data);
-    }
+    const webview = new WebViewProvider(context, vectorDB as VectorDatabase);
 
-    const documents = await analyzeWorkspaceDocuments();
-    if (documents) {
-      console.log(`Total documents: ${documents.length}`);
-      documents.forEach((doc) => {
-        console.log("Document Name: ", doc.documentName);
-      });
-    }
-
-    // Listen for file creation
-    const fileCreationListener = vscode.workspace.onDidCreateFiles(
-      async (event) => {
-        for (const file of event.files) {
-          try {
-            // Read the content of the newly created file
-            const fileContent = await fs.readFile(file.fsPath, "utf8");
-
-            // Count the number of lines
-            const lineCount = fileContent.split("\n").length;
-
-            // Show line count information
-            vscode.window.showInformationMessage(
-              `Embedding new file: ${file.fsPath}.`
-            );
-            console.log(
-              `File created at path: ${file.fsPath} with ${lineCount} lines.`
-            );
-
-            vectorDB.addItemToVectorStore(fileContent, file.fsPath);
-
-            saveVectorDBToWorkspaceState();
-          } catch (error) {
-            vscode.window.showErrorMessage(
-              `Error reading file ${file.fsPath}: ${error}`
-            );
-            console.error(`Error reading file ${file.fsPath}:`, error);
-          }
-        }
-      }
+    const inlineSuggestionProvider = new inlineAiSuggestionsProvider(
+      vectorDB as VectorDatabase
     );
 
-    //Listen for file deletion
-    const fileDeletionListener = vscode.workspace.onDidDeleteFiles((event) => {
-      event.files.forEach((file) => {
-        vscode.window.showInformationMessage(`File deleted: ${file.fsPath}`);
-        console.log(`File deleted at path: ${file.fsPath}`);
-        const vector = vectorDB.readEmbeddingsFile();
-        console.log("Type of vector: ", typeof vector?.items);
-
-        if (vector && vector.items && Array.isArray(vector.items)) {
-          console.log("Starting len: ", vector.items.length);
-          const updatedVectors = vector.items.filter((vector) => {
-            return vector.metadata.filePath !== file.fsPath; // Return boolean
-          });
-
-          console.log(updatedVectors.length);
-          let updatedVectorObj = { ...vector, items: updatedVectors };
-          vectorDB.writeEmbeddingsFile(updatedVectorObj);
-          saveVectorDBToWorkspaceState();
-        }
-        // You can add your logic here to handle the deleted file
-      });
-    });
-
-    context.subscriptions.push(fileCreationListener, fileDeletionListener);
-
-    const inlineSuggestionProvider = new inlineAiSuggestionsProvider(vectorDB);
+    if (vectorDB) {
+      webview.updateVectorDatabase(vectorDB as VectorDatabase);
+    }
 
     context.subscriptions.push(
       vscode.commands.registerCommand(
@@ -143,8 +269,23 @@ export async function activate(context: vscode.ExtensionContext) {
       }),
       vscode.commands.registerCommand("ollama-copilot.clearEmbedData", () => {
         promptForClearWorkspaceEmbeddedData(context);
-        vectorDB.clearEmbeddingsFile();
+        if (vectorDB) {
+          vectorDB.clearIndex();
+        }
       }),
+      vscode.commands.registerCommand(
+        "ollama-copilot.seeSimilarQueries",
+        async () => {
+          const query = await vscode.window.showInputBox({
+            prompt: "Enter query.",
+            value: "",
+          });
+
+          if (vectorDB && query) {
+            console.log("result: ", vectorDB.getSimilarQueries(query));
+          }
+        }
+      ),
       vscode.commands.registerCommand(
         "ollama-copilot.resetStoredValues",
         () => {
@@ -166,7 +307,7 @@ export async function activate(context: vscode.ExtensionContext) {
       )
     );
 
-    const promptModelWithPreWrittenQuery = (prompt: string) => {
+    const promptModelWithPreWrittenQuery = async (prompt: string) => {
       /* 
       1. Check for selected text.
       2. Prompt AI for more info about the text.
@@ -183,6 +324,7 @@ export async function activate(context: vscode.ExtensionContext) {
           vscode.window.showInformationMessage(
             `Selected text: ${selectedText}`
           );
+          await vscode.commands.executeCommand("ollamaView.focus");
           webview.promptAI(prompt + selectedText);
         } else {
           vscode.window.showInformationMessage("No text selected.");
@@ -219,7 +361,7 @@ export async function activate(context: vscode.ExtensionContext) {
       }),
       vscode.commands.registerCommand("ollama-copilot.embedCode", async () => {
         const editor = vscode.window.activeTextEditor;
-        if (editor) {
+        if (editor && vectorDB) {
           // Get the selected text
           const selection = editor.selection;
           const selectedText = editor.document.getText(selection);
@@ -230,7 +372,10 @@ export async function activate(context: vscode.ExtensionContext) {
             );
             let id = getWorkSpaceId();
 
-            await vectorDB.addItemToVectorStore(selectedText, id ? id : "");
+            await vectorDB.addItemToVectorStore(
+              selectedText,
+              id.activeDocument ? id.activeDocument : ""
+            );
 
             saveVectorDBToWorkspaceState();
           } else {
@@ -275,10 +420,8 @@ export async function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(inlineCompletionProvider);
 
-    const model = context.globalState.get<string>("ollamaModel");
-    if (model === undefined) {
-      await setupOllama(context);
-    }
+    let lastCheckedDoc = "";
+    let lastCheckTime = 0;
 
     let disposable = vscode.workspace.onDidChangeTextDocument(async (event) => {
       const editor = vscode.window.activeTextEditor;
@@ -287,23 +430,23 @@ export async function activate(context: vscode.ExtensionContext) {
       }
       const change = event.contentChanges[0];
 
-      const model = context.globalState.get<string>(
-        $keys.OLLAMA_MODEL,
-        llama3.name
-      );
-
-      const ollamaHeaders = context.globalState.get<string>(
-        $keys.OLLAMA_HEADERS,
-        "{}"
-      );
-
-      const ollamaUrlChatCompletion = context.globalState.get<string>(
-        $keys.OLLAMA_CHAT_COMPLETION_URL,
-        defaultURLChat
-      );
-
       const checkAndInsertSuggestion = async () => {
         try {
+          const model = context.globalState.get<string>(
+            $keys.OLLAMA_MODEL,
+            llama3.name
+          );
+
+          const ollamaHeaders = context.globalState.get<string>(
+            $keys.OLLAMA_HEADERS,
+            "{}"
+          );
+
+          const ollamaUrlChatCompletion = context.globalState.get<string>(
+            $keys.OLLAMA_CHAT_COMPLETION_URL,
+            defaultURLChat
+          );
+
           const document = editor.document;
           const position = editor.selection.active;
 
@@ -339,23 +482,122 @@ export async function activate(context: vscode.ExtensionContext) {
           InlineCompletionProvider.showNextSuggestion();
         }
       }
+      const checkAndEmbedDocuments = async () => {
+        const doc = getWorkSpaceId();
+        const currentTime = Date.now();
+        if (!vectorDB) {
+          return;
+        }
+
+        if (
+          doc.activeDocument &&
+          (lastCheckedDoc !== doc.activeDocument ||
+            lastCheckTime + 30000 < currentTime)
+        ) {
+          lastCheckedDoc = doc.activeDocument;
+          lastCheckTime = currentTime;
+          // Read file content and count lines
+          try {
+            const docs = context.workspaceState.get(
+              $keys.WORKSPACE_DOCUMENTS_KEY,
+              "[]"
+            );
+
+            if (docs) {
+              const documents = JSON.parse(docs) as {
+                documentName: string;
+                lineCount: number;
+              }[];
+
+              if (!documents) {
+                return;
+              }
+
+              const fileContent = await fs.readFile(doc.activeDocument, "utf8");
+              const lineCount = fileContent.split("\n").length;
+              let currentDoc = documents?.find(
+                (_doc) => _doc.documentName === doc.activeDocument
+              );
+              console.log(
+                "Checking doc line count; prev:",
+                currentDoc?.lineCount,
+                " current: ",
+                lineCount
+              );
+              if (currentDoc && currentDoc.lineCount + 50 < lineCount) {
+                console.log(
+                  `Updating embedding document file: ${currentDoc.documentName}`
+                );
+
+                const vectors = await vectorDB.saveWorkspace();
+                if (vectors) {
+                  // Normalize paths for consistent comparison
+                  const currentDocPath = path.normalize(
+                    currentDoc.documentName
+                  );
+
+                  const updatedVectors = vectors.items.filter((vec) => {
+                    const vecFilePath = path.normalize(
+                      vec.metadata.filePath as string
+                    );
+
+                    return vecFilePath === currentDocPath;
+                  });
+
+                  console.log(
+                    "Files with matching paths: ",
+                    updatedVectors.length
+                  );
+                  if (updatedVectors) {
+                    updatedVectors.forEach(async (item) => {
+                      await vectorDB.deleteItem(item.id);
+                    });
+                  }
+
+                  vectorDB.addItemToVectorStore(
+                    fileContent,
+                    currentDoc.documentName
+                  );
+                  saveVectorDBToWorkspaceState();
+                }
+              }
+            }
+          } catch (e) {
+            console.error(
+              "An error occurred while reading active document content."
+            );
+          }
+        }
+      };
+      checkAndEmbedDocuments();
 
       if (
         event.contentChanges.some((change) => {
           return (
-            change.text.startsWith("//") ||
-            change.text.startsWith("class") ||
+            change.text.endsWith(".") ||
             change.text.endsWith("[") ||
             change.text.endsWith("]") ||
             change.text.endsWith(":") ||
-            change.text.endsWith(";") || // Optional: check for semicolon
-            change.text.endsWith("{") || // Optional: check for opening brace
-            change.text.endsWith("}") || // Optional: check for closing brace;
-            change.text.endsWith("=") || // Optional: check for equal sign;
-            change.text.endsWith("for") || // Optional: check for equal sign;
-            change.text.endsWith("=>") || // Optional: check for equal sign;
-            change.text.startsWith("def") || // Optional: check for equal sign;
-            change.text.startsWith("function") // Optional: check for equal sign;
+            change.text.endsWith(";") ||
+            change.text.endsWith("{") ||
+            change.text.endsWith("}") ||
+            change.text.endsWith("=") ||
+            change.text.endsWith("for") ||
+            change.text.endsWith("=>") ||
+            change.text.startsWith("class") ||
+            change.text.startsWith("def") ||
+            change.text.startsWith("function") ||
+            change.text.startsWith("let") ||
+            change.text.startsWith("const") ||
+            change.text.startsWith("int") ||
+            change.text.startsWith("boolean") ||
+            change.text.startsWith("struct") ||
+            change.text.startsWith("long") ||
+            change.text.startsWith("short") ||
+            change.text.startsWith("float") ||
+            change.text.startsWith("double") ||
+            change.text.startsWith("string") ||
+            change.text.startsWith("new")
           );
         })
       ) {

@@ -1,5 +1,11 @@
 import { isValidJson } from "../utils";
-import { deleteIcon, closeSvgIcon, ellipsesSvg, copySvgIcon } from "../svgs";
+import {
+  deleteIcon,
+  closeSvgIcon,
+  ellipsesSvg,
+  copySvgIcon,
+  editSvgIcon,
+} from "../svgs";
 import { MessageRoles } from "../providers/webViewProvider";
 import { HTML_IDS as $id } from "../constants/HTMLElementIds";
 import {
@@ -23,11 +29,13 @@ const vscode = acquireVsCodeApi();
 let ollamaImgPromise: Promise<string>;
 let ollamaChatHistoryPromise: Promise<ChatContainer>;
 let ollamaThemePreference: Promise<OllamaWebviewThemes>;
+let ollamaUserSystemPrompt: Promise<string>;
 
 const createPromises = () => {
   let resolveImage: (value: string) => void;
   let resolveChatHistory: (value: ChatContainer) => void;
   let resolveThemePreference: (value: OllamaWebviewThemes) => void;
+  let resolveSystemPrompt: (value: string) => void;
 
   ollamaImgPromise = new Promise((resolve) => {
     resolveImage = resolve;
@@ -39,6 +47,10 @@ const createPromises = () => {
 
   ollamaThemePreference = new Promise((resolve) => {
     resolveThemePreference = resolve;
+  });
+
+  ollamaUserSystemPrompt = new Promise((resolve) => {
+    resolveSystemPrompt = resolve;
   });
 
   window.addEventListener("message", (event) => {
@@ -69,6 +81,9 @@ const createPromises = () => {
             >()
           );
         }
+        break;
+      case "setUserSystemPrompt":
+        resolveSystemPrompt(message.systemPrompt);
         break;
     }
   });
@@ -182,6 +197,7 @@ function reattachEventListeners() {
   });
 }
 
+//Requests data from the extension on load.
 const requestData = () => {
   vscode.postMessage({
     command: "requestImageUri",
@@ -194,16 +210,19 @@ const requestData = () => {
   vscode.postMessage({
     command: "getThemePreference",
   });
+
+  vscode.postMessage({
+    command: "getUserSystemPrompt",
+  });
 };
 
 requestData();
 
 async function main() {
   const conversationsContainer: ChatContainer = await ollamaChatHistoryPromise;
-  // let DOM: HTMLElement[] = [];
+
   const DOM: { [key: string]: HTMLElement } = {};
 
-  // console.log("Map: ", conversationsContainer);
   console.log("Conversation container size: " + conversationsContainer.size);
 
   if (!conversationsContainer) {
@@ -212,10 +231,20 @@ async function main() {
   }
 
   const ollamaImg = await ollamaImgPromise;
-  // console.log(`\nImg: , ${ollamaImg}\n`);
+
+  const userSystemPrompt = await ollamaUserSystemPrompt;
 
   let selectedUUID = "";
-  let documentsAppendedToQuery: any[] = [];
+  let documentsAppendedToQuery: {
+    fileName: string;
+    fileContent: string;
+    filePath: string;
+  }[] = [];
+  let documentsToEmbed: {
+    fileName: string;
+    fileContent: string;
+    filePath: string;
+  }[] = [];
   let queriesMade: number = 0;
   //create html element objects using the values from the html_ids file and
 
@@ -301,8 +330,6 @@ async function main() {
   const handleMouseEnter = () => {
     DOM[$id.SEND_BUTTON].style.background = "#d8d8d8";
     DOM[$id.SEND_BUTTON].style.boxShadow = "3px 3px 5px #717171";
-    // sendButton.style.background = "#d8d8d8";
-    // sendButton.style.boxShadow = "3px 3px 5px #717171";
   };
 
   const handleMouseLeave = () => {
@@ -311,10 +338,6 @@ async function main() {
   };
 
   const activateSendButton = () => {
-    // if (!sendButton) {
-    //   return;
-    // }
-
     (DOM[$id.SEND_BUTTON] as HTMLButtonElement).disabled = false;
     (DOM[$id.SEND_BUTTON] as HTMLButtonElement).style.background = "#fff";
     (DOM[$id.SEND_BUTTON] as HTMLButtonElement).style.color = "#000";
@@ -327,19 +350,9 @@ async function main() {
       "mouseleave",
       handleMouseLeave
     );
-
-    // sendButton.disabled = false;
-    // sendButton.style.background = "#fff";
-    // sendButton.style.color = "#000";
-    // sendButton.style.cursor = "pointer";
-    // sendButton.addEventListener("mouseenter", handleMouseEnter);
-    // sendButton.addEventListener("mouseleave", handleMouseLeave);
   };
 
   const deactivateSendButton = () => {
-    // if (!sendButton) {
-    //   return;
-    // }
     (DOM[$id.SEND_BUTTON] as HTMLButtonElement).disabled = true;
     (DOM[$id.SEND_BUTTON] as HTMLButtonElement).style.background = "#bebebe";
     (DOM[$id.SEND_BUTTON] as HTMLButtonElement).style.color = "#00000027";
@@ -352,13 +365,6 @@ async function main() {
       "mouseleave",
       handleMouseLeave
     );
-
-    // sendButton.disabled = true;
-    // sendButton.style.background = "#bebebe";
-    // sendButton.style.color = "#00000027";
-    // sendButton.style.cursor = "auto";
-    // sendButton.removeEventListener("mouseenter", handleMouseEnter);
-    // sendButton.removeEventListener("mouseleave", handleMouseLeave);
   };
 
   const resetUserQuery = () => {
@@ -418,7 +424,49 @@ async function main() {
       saveData();
     });
     deleteButton.innerHTML = `<div class="flex-nowrap justifyCenter itemsCenter">${deleteIcon} Delete</div>`;
+
+    const editButton = document.createElement("button");
+    editButton.addEventListener("click", (e) => {
+      e.stopPropagation();
+      labelOption.classList.remove("active");
+      // chatLabel.innerHTML = "";
+      const inputField = document.createElement("input");
+      inputField.type = "text";
+      inputField.value = labelName.innerText;
+
+      const handleSubmit = () => {
+        labelName.innerText = inputField.value;
+        try {
+          if (labelName.contains(inputField)) {
+            labelName.removeChild(inputField);
+          }
+        } catch (e) {
+          console.log(e);
+        }
+
+        let component = conversationsContainer.get(uuid);
+        if (component) {
+          console.log("Updating conversation container.");
+          component.label = inputField.value;
+        }
+        saveData();
+      };
+
+      inputField.addEventListener("blur", handleSubmit);
+      inputField.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+          handleSubmit();
+        }
+      });
+
+      labelName.appendChild(inputField);
+      inputField.focus();
+    });
+
+    editButton.innerHTML = `<div class="flex-nowrap justifyCenter itemsCenter">${editSvgIcon} Edit</div>`;
+
     menu.appendChild(deleteButton);
+    menu.appendChild(editButton);
     labelOption.appendChild(menu);
     chatLabel.appendChild(labelOption);
     return chatLabel;
@@ -568,6 +616,7 @@ async function main() {
     if (!sidePanel || !container) {
       return;
     }
+
     sidePanel.style.width = "0"; // Reset the width of the side panel
     sidePanel.style.paddingLeft = "0";
     container.classList.remove("with-panel"); // Move content back
@@ -578,15 +627,20 @@ async function main() {
   const handleClickOutsidePanel = (event: Event) => {
     const sidePanel = document.getElementById("sidePanel");
 
-    // openSidePanelBtn;
-    // console.log(event.target);
     // Check if the click was outside the side panel and its content
     if (
       sidePanel &&
       !sidePanel.contains(event.target as Node) &&
       !DOM[$id.OPEN_SIDE_PANEL_BUTTON].contains(event.target as Node)
-      // !openSidePanelBtn.contains(event.target as Node)
     ) {
+      let activeSidePanelMenus = document.querySelectorAll(".active");
+      if (activeSidePanelMenus) {
+        activeSidePanelMenus.forEach((menu) => {
+          menu.classList.remove("active");
+        });
+      }
+
+      console.log("Closing side panel", event.target);
       closeSidePanel();
     }
   };
@@ -601,7 +655,38 @@ async function main() {
     return;
   };
 
+  function debounce(func: (...args: any[]) => void, delay: number) {
+    let debounceTimer: NodeJS.Timeout | undefined;
+
+    return (...args: any[]) => {
+      // Clear the previous timer if it exists
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+
+      // Set a new timer to invoke the function after the specified delay
+      debounceTimer = setTimeout(() => {
+        func(...args); // Call the original function with the provided arguments
+      }, delay);
+    };
+  }
+
+  const debounceSystemPrompt = debounce((systemPrompt: string) => {
+    vscode.postMessage({
+      command: "saveUserSystemPrompt",
+      systemPrompt: systemPrompt,
+    });
+  }, 3000);
+
+  DOM[$id.SYSTEM_PROMPT].addEventListener("input", (e) => {
+    const systemPrompt = (e.target as HTMLInputElement).value;
+    console.log("Input: ", systemPrompt);
+    debounceSystemPrompt(systemPrompt);
+  });
+
   setTheme(await ollamaThemePreference);
+
+  DOM[$id.SYSTEM_PROMPT].innerText = userSystemPrompt;
 
   //Checks to see if conversationsContainer has any values already and uses the users previous chat to display, instead of the new chat screen.
   if (conversationsContainer && conversationsContainer.size) {
@@ -658,6 +743,24 @@ async function main() {
   DOM[$id.ADD_FILE_BUTTON].addEventListener("click", async () => {
     vscode.postMessage({
       command: "openFileDialog",
+      embeddedDoc: false,
+    });
+  });
+
+  DOM[$id.EMBED_FILE_BUTTON].addEventListener("click", async () => {
+    vscode.postMessage({
+      command: "openFileDialog",
+      embeddedDoc: true,
+    });
+  });
+
+  DOM[$id.SAVE_EMBEDDED_DOCS_BUTTON].addEventListener("click", async () => {
+    if (!documentsToEmbed.length) {
+      return;
+    }
+    vscode.postMessage({
+      command: "embedFiles",
+      files: documentsToEmbed,
     });
   });
 
@@ -779,6 +882,31 @@ async function main() {
       DOM[$id.APPENDED_DOCUMENTS_CONTAINER].appendChild(docElement);
     });
     activateSendButton();
+  }
+
+  function updateEmbeddedDocumentsUI() {
+    DOM[$id.DIV_DOCS_TO_EMBED_CONTAINER].innerHTML = ""; // Clear the existing list
+
+    documentsToEmbed.forEach((doc, index) => {
+      const docElement = document.createElement("div");
+      docElement.className = "appended-document";
+
+      const docName = document.createElement("span");
+      docName.innerText = doc.fileName;
+
+      const removeIcon = document.createElement("span");
+      removeIcon.className = "remove-icon";
+      removeIcon.innerHTML = closeSvgIcon;
+      removeIcon.onclick = () => {
+        documentsToEmbed.splice(index, 1); // Remove the document from the array
+        updateEmbeddedDocumentsUI(); // Refresh the UI
+      };
+
+      docElement.appendChild(docName);
+      docElement.appendChild(removeIcon);
+
+      DOM[$id.DIV_DOCS_TO_EMBED_CONTAINER].appendChild(docElement);
+    });
   }
 
   function clearDocumentsContainer() {
@@ -904,109 +1032,6 @@ async function main() {
     updateConversationContainer();
   }
 
-  /* async function parseAndDisplayResponse(aiResponse: string) {
-    if (typeof aiResponse !== "string") {
-      vscode.postMessage({
-        command: "logError",
-        text: `Invalid response message: \nReceived:${typeof aiResponse} | Expected a string.`,
-      });
-
-      return;
-    }
-    //FIXME - update this function to parse multiple code container blocks.
-    // Regular expression to match back ticks
-
-    const codeRegex = /([\s\S]*?)```([\s\S]*?)```([\s\S]*)/;
-
-    const matches = aiResponse.match(codeRegex);
-    // console.log(JSON.stringify(matches));
-
-    const aiMessage = document.createElement("div");
-    aiMessage.className = "ai-message";
-
-    if (matches && matches.length > 0) {
-      const textBeforeCode = matches[1] ? matches[1].trim() : ""; // Ensure it's not undefined
-      const code = matches[2] ? matches[2].trim() : ""; // Ensure it's not undefined
-      const remainingText = matches[3] ? matches[3].trim() : ""; // Ensure it's not undefined
-
-      // Create and append the div for text before the code
-      if (textBeforeCode.trim()) {
-        const preCodeContainer = document.createElement("div");
-        preCodeContainer.className = "pre-code-container";
-        const ollamaImg = await ollamaImgPromise;
-        preCodeContainer.insertAdjacentHTML(
-          "afterbegin",
-          `<div class="flex-nowrap pt-4 itemsCenter">
-            <img src="${ollamaImg}" alt="Ollama" class="ollama-message-icon"/>
-            <div>${textBeforeCode.trim()}</div>
-           </div>
-        `
-        );
-        // preCodeContainer.innerText = textBeforeCode.trim();
-        aiMessage.appendChild(preCodeContainer);
-      }
-
-      // Create and append the div for the code block
-      const codeContainer = document.createElement("div");
-      codeContainer.className = "code-container";
-
-      const clipboardIcon = document.createElement("span");
-      clipboardIcon.className = "clipboard-icon";
-      clipboardIcon.innerHTML = copySvgIcon;
-      clipboardIcon.onclick = () => copyToClipboard(code);
-
-      const codeBlock = document.createElement("pre");
-      codeBlock.innerText = `\n${code}`;
-
-      codeContainer.appendChild(clipboardIcon);
-      codeContainer.appendChild(codeBlock);
-      aiMessage.appendChild(codeContainer);
-
-      // Create and append the div for remaining text
-      if (remainingText.trim()) {
-        const postCodeContainer = document.createElement("div");
-        postCodeContainer.className = "post-code-container";
-        postCodeContainer.innerText = remainingText.trim();
-        aiMessage.appendChild(postCodeContainer);
-      }
-
-      const clipboardIconContainer = document.createElement("div");
-      clipboardIconContainer.className = "clipboard-icon-container tooltip";
-      clipboardIconContainer.onclick = () => {
-        copyToClipboard(
-          aiMessage.innerText.replaceAll(copySvgIcon, "").replace("Copy", "")
-        );
-      };
-
-      const toolTipCopyMessage = document.createElement("span");
-      toolTipCopyMessage.className = "tooltiptext";
-      toolTipCopyMessage.innerHTML = "Copy";
-      clipboardIconContainer.appendChild(toolTipCopyMessage);
-
-      const clipboardIcon_ = document.createElement("span");
-      clipboardIcon_.className = "clipboard-icon-messages";
-      clipboardIcon_.innerHTML = copySvgIcon;
-
-      clipboardIconContainer.appendChild(clipboardIcon_);
-
-      const messageOptions = document.createElement("div");
-      messageOptions.className = "message-options";
-      messageOptions.appendChild(clipboardIconContainer);
-
-      aiMessage.appendChild(messageOptions);
-      DOM[$id.CONVERSATION].appendChild(aiMessage);
-      DOM[$id.CONVERSATION].scrollTop = DOM[$id.CONVERSATION].scrollHeight;
-
-      updateConversationContainer();
-    } else {
-      // If no code block, display the entire response as regular text
-      displayMessage(aiResponse, "ai");
-    }
-
-    // Hide loading indicator
-    DOM[$id.LOADING_INDICATOR].style.display = "none";
-  } */
-
   function parseAIResponse(aiResponse: string) {
     if (typeof aiResponse !== "string") {
       vscode.postMessage({
@@ -1130,12 +1155,24 @@ async function main() {
         case "fileSelected":
           const fileName = message.fileName;
           const fileContent = message.content;
+          const filePath = message.fullFileName;
+          if (message.embeddedDoc) {
+            documentsToEmbed.push({
+              fileName: fileName,
+              fileContent: fileContent,
+              filePath: filePath,
+            });
 
-          documentsAppendedToQuery.push({
-            fileName: fileName,
-            fileContent: fileContent,
-          });
-          updateAppendedDocumentsUI();
+            updateEmbeddedDocumentsUI();
+          } else {
+            documentsAppendedToQuery.push({
+              fileName: fileName,
+              fileContent: fileContent,
+              filePath: filePath,
+            });
+
+            updateAppendedDocumentsUI();
+          }
           break;
         case "updateChatHistory":
           if (!conversationsContainer || !conversationsContainer.size) {

@@ -394,10 +394,11 @@ body {
   border-radius: 4px;
   background-color: inherit;
   cursor: pointer;
-  display: flex;
+  display: grid;
+  grid-template-columns: 80% 1fr;
   gap: 4px;
-  justify-content: space-around;
   align-items: center;
+  justify-items: start;
 }
 
 .label:hover {

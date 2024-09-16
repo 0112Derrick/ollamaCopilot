@@ -168,14 +168,13 @@ export async function promptForModel(
 export async function promptForClearWorkspaceEmbeddedData(
   context: vscode.ExtensionContext
 ) {
-  let clearEmbeddedData = false;
+  vscode.window.showWarningMessage(`This is permanent and cannot be reversed.`);
 
   const resultClearEmbeddedData = await vscode.window.showInputBox({
     prompt:
       "Would you like to clear your workspace embedded data? ( true | False )?",
     value: "false",
   });
-  vscode.window.showWarningMessage(`This is permanent and cannot be reversed.`);
 
   if (
     resultClearEmbeddedData &&

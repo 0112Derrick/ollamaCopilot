@@ -1,4 +1,4 @@
-import { LocalIndex, MetadataTypes, QueryResult } from "vectra";
+import { IndexItem, LocalIndex, MetadataTypes, QueryResult } from "vectra";
 import path from "path";
 import {
   defaultEmbedURL,
@@ -18,16 +18,19 @@ export default class VectraDB {
   private _ollamaHeaders: { [key: string]: string } = {};
   private _ollamaEmbedUrl: string;
   private indexFilePath: string;
+  private indexDirPath: string;
 
   constructor(context: vscode.ExtensionContext) {
     // console.log("Dirname: ", __dirname);
     // Path for the index folder
     const indexPath = path.join(__dirname, "index");
+    this.indexDirPath = indexPath;
     // console.log("Path :", indexPath);
     // Ensure directory exists
     if (!fs.existsSync(indexPath)) {
       fs.mkdirSync(indexPath, { recursive: true });
     }
+
     //Setting up vectra vector db data store locally
     this._index = new LocalIndex(indexPath);
     this.indexFilePath = path.join(__dirname, "index", "index.json");
@@ -59,6 +62,10 @@ export default class VectraDB {
 
   async createIndex() {
     // Ensure directory exists
+    if (!fs.existsSync(this.indexDirPath)) {
+      fs.mkdirSync(this.indexDirPath, { recursive: true });
+    }
+
     if (!(await this._index.isIndexCreated())) {
       await this._index.createIndex();
     }
@@ -109,15 +116,17 @@ export default class VectraDB {
       if ((data as openAiResponse).data) {
         // This is an openAiResponse
         const openAiData = data as openAiResponse;
-        console.log(openAiData.data[0].embedding);
+        console.log("Here 1");
+        // console.log(openAiData.data[0].embedding);
         return openAiData.data[0].embedding;
       } else if ((data as ollamaResponse).embeddings) {
         // This is an ollamaResponse
         const ollamaData = data as ollamaResponse;
-        console.log(ollamaData.embeddings[0]);
+        console.log("Here 2");
+        // console.log(ollamaData.embeddings[0]);
         return ollamaData.embeddings;
       }
-
+      console.log("Here 3");
       return response.data;
     } catch (error) {
       console.error("Error: " + error);
@@ -137,6 +146,10 @@ export default class VectraDB {
 
   //Add item to vector db
   async addItemToVectorStore(fileContent: string, filePath?: string) {
+    if (!fileContent) {
+      return;
+    }
+
     const lines = fileContent.split("\n");
     const lineCount = lines.length;
 
@@ -186,81 +199,142 @@ export default class VectraDB {
     matchesLimit: number = 3,
     debug: boolean = false
   ): Promise<QueryResult<Record<string, MetadataTypes>>[] | null[]> {
-    const embeddings = (await this.getEmbedding(fileContent)).flat();
+    if (!fileContent) {
+      throw new Error("File content is necessary.");
+    }
 
-    if (embeddings.length === 0) {
-      console.log(
-        "Error occurred while retrieving vector data - querying item function"
-      );
+    try {
+      console.log("Embedding data.");
+      const embeddings = (await this.getEmbedding(fileContent)) as number[];
+      // console.log("Embedding: ", embeddings);
+      // const embeddings = e.flat();
+
+      if (embeddings.length === 0) {
+        console.log(
+          "Error occurred while retrieving vector data - querying item function"
+        );
+        return [];
+      }
+
+      //FIXME - WTF query items only works after embedding data using their api not just writing to the file.
+      const results = await this._index.queryItems(embeddings, matchesLimit);
+      console.log("\nResults: ", results, "\n");
+
+      if (debug) {
+        results.forEach((result) =>
+          console.log(`[${result.score}] ${result.item.metadata.content}`)
+        );
+      }
+
+      return results;
+    } catch (error) {
+      console.log("An error occurred while querying vector store.");
       return [];
     }
-
-    const results = await this._index.queryItems(embeddings, matchesLimit);
-
-    if (debug) {
-      results.forEach((result) =>
-        console.log(`[${result.score}] ${result.item.metadata.content}`)
-      );
-    }
-
-    return results;
   }
 
   async getSimilarQueries(query: string, minMatch?: number) {
-    if (!minMatch) {
-      minMatch = 0.15;
-    }
+    try {
+      await this.createIndex();
 
-    let similarQueries = `Similar queries: `;
+      let similarQueries = `Similar queries: `;
 
-    await this.createIndex();
+      // await this.createIndex();
 
-    let similarUserQueries = await this.queryVectorStore(
-      query.toLowerCase(),
-      3
-    );
-
-    const set = new Set<number>();
-
-    similarUserQueries.forEach((vector) => {
-      if (!vector) {
-        return;
-      }
-
-      let score = vector.score;
-
-      if (score < 0) {
-        score = score * -1;
-      }
-
-      let minScore = minMatch;
-
-      console.log(
-        "Score:" +
-          Number.parseFloat(score.toPrecision(2)) +
-          "\nMin score:" +
-          minScore +
-          `\n result: ${minScore <= Number.parseFloat(score.toPrecision(2))}\n`
+      let similarUserQueries = await this.queryVectorStore(
+        query.toLowerCase(),
+        3
       );
 
-      if (
-        !set.has(vector.score) &&
-        minScore <= Number.parseFloat(score.toPrecision(2))
-      ) {
-        set.add(vector.score);
-        console.log("_______________________");
+      const set = new Set<number>();
+
+      if (!similarUserQueries || !similarUserQueries.length) {
+        console.log("No similar queries returned.");
+        return "";
+      }
+
+      similarUserQueries.forEach((vector) => {
+        if (!vector) {
+          console.log("No vectors received.");
+          return;
+        }
+
+        console.log("Checking vectors.");
+        let score = vector.score;
+
+        if (score < 0) {
+          score = score * -1;
+        }
+
+        if (!minMatch) {
+          minMatch = 0.15;
+        }
+        let minScore = minMatch;
+
         console.log(
-          `\nScore: [${vector.score}] File content: ${vector.item.metadata.content} File path: ${vector.item.metadata.filePath}\n`
+          "Score:" +
+            Number.parseFloat(score.toPrecision(2)) +
+            "\nMin score:" +
+            minScore +
+            `\n result: ${
+              minScore <= Number.parseFloat(score.toPrecision(2))
+            }\n`
         );
 
-        similarQueries += `File content: ${vector.item.metadata.content}, File path: ${vector.item.metadata.filePath} `;
-      }
-    });
+        if (
+          !set.has(vector.score) &&
+          minScore <= Number.parseFloat(score.toPrecision(2))
+        ) {
+          set.add(vector.score);
+          console.log("_______________________");
+          console.log(
+            `\nScore: [${vector.score}] File content: ${vector.item.metadata.content} File path: ${vector.item.metadata.filePath}\n`
+          );
 
-    return similarQueries;
+          similarQueries += `File content: ${vector.item.metadata.content}, File path: ${vector.item.metadata.filePath} `;
+        }
+      });
+
+      return similarQueries;
+    } catch (error) {
+      console.error(
+        "An error occurred while getting similar queries. Path: ",
+        __filename,
+        " error: ",
+        error
+      );
+    }
   }
 
-  async indexWorkspaceDocuments() {
+  async getItems(): Promise<IndexItem<Record<string, MetadataTypes>>[]> {
+    return await this._index.listItems();
+  }
+
+  /* 
+  Returns true if it successfully updated the items and false otherwise.
+  */
+  async updateItems(items: IndexItem[]): Promise<boolean> {
+    try {
+      for (const item of items) {
+        await this._index.upsertItem(item);
+      }
+      return true;
+    } catch (e) {
+      console.error("An error occurred while updating items. " + e);
+      return false;
+    }
+  }
+
+  async deleteItem(id: string) {
+    try {
+      vscode.window.showInformationMessage("Deleting embedded item: ", id);
+      await this._index.deleteItem(id);
+    } catch (e) {
+      console.log("An error occurred while deleting an item. ", e);
+    }
+  }
+
+  async indexWorkspaceDocuments(): Promise<void> {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders) {
       vscode.window.showErrorMessage("No workspace is open.");
@@ -315,62 +389,57 @@ export default class VectraDB {
     }
   }
 
-  clearEmbeddingsFile(): void {
+  async clearIndex(): Promise<void> {
     try {
-      // Check if the file exists
-      if (fs.existsSync(this.indexFilePath)) {
-        // Overwrite the file with an empty array (or any structure you use)
-        fs.writeFileSync(this.indexFilePath, JSON.stringify({}));
-        console.log("Embeddings file cleared.");
-      } else {
-        console.warn("Embeddings file not found.");
-      }
+      await this._index.deleteIndex();
+      await this.createIndex();
     } catch (error) {
       console.error("Error clearing embeddings file:", error);
     }
   }
 
-  writeEmbeddingsFile(data: {
+  async loadWorkSpace(data: {
     version: number;
     metadata_config: {};
-    items: {
-      id: string;
-      metadata: { filePath: string; content: string };
-      vector: number[];
-    }[];
-  }): void {
+    items: IndexItem[];
+  }): Promise<void> {
     try {
       // Convert data to JSON format and write it to index.json
-      fs.writeFileSync(this.indexFilePath, JSON.stringify(data));
-      console.log("Data successfully written to embeddings file.");
+
+      await this._index.beginUpdate();
+
+      for (const item of data.items) {
+        await this._index.upsertItem(item);
+      }
+      await this._index.endUpdate();
+      console.log(
+        "Data successfully written to embeddings file:",
+        this.indexFilePath
+      );
+      // const stats = await this._index.getIndexStats();
+
+      // console.log("Index stats: ", stats);
     } catch (error) {
-      console.error("Error writing to embeddings file:", error);
+      console.error(
+        "Error writing to embeddings file at",
+        this.indexFilePath,
+        error
+      );
+      this._index.cancelUpdate();
     }
   }
 
-  readEmbeddingsFile(): {
+  async saveWorkspace(): Promise<{
     version: number;
     metadata_config: {};
-    items: {
-      id: string;
-      metadata: { filePath: string; content: string };
-      vector: number[];
-    }[];
-  } | null {
-    try {
-      // Check if the file exists
-      if (fs.existsSync(this.indexFilePath)) {
-        // Read the content of the file and parse it as JSON
-        const data = fs.readFileSync(this.indexFilePath, "utf8");
-
-        return JSON.parse(data);
-      } else {
-        console.warn("Embeddings file not found.");
-        return null;
-      }
-    } catch (error) {
-      console.error("Error reading embeddings file:", error);
-      return null;
-    }
+    items: IndexItem[];
+  }> {
+    const stats = await this._index.getIndexStats();
+    const items = await this._index.listItems();
+    return {
+      version: stats.version,
+      metadata_config: stats.metadata_config,
+      items: items,
+    };
   }
 }

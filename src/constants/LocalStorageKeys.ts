@@ -9,6 +9,7 @@ const LOCAL_STORAGE_KEYS = {
   THEME_PREFERENCE_KEY: "ollama_copilot_theme_preference",
   VECTOR_DATABASE_KEY: "ollama_copilot_workspace_",
   WORKSPACE_DOCUMENTS_KEY: "ollama_copilot_workspace_documents",
+  USER_SYSTEM_PROMPT_KEY: "ollama_copilot_user_system_prompt",
 };
 
 for (let prop in LOCAL_STORAGE_KEYS) {

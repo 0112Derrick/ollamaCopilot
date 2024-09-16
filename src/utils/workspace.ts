@@ -9,8 +9,13 @@ export const getWorkSpaceId = () => {
     ? vscode.workspace.workspaceFolders[0].uri.fsPath // for single-folder workspaces
     : null;
 
-  console.log("Workspace Unique ID:", workspaceId, "\n");
-  return workspaceId;
+  const activeEditor = vscode.window.activeTextEditor;
+  const activeDocument = activeEditor ? activeEditor.document.uri.fsPath : null;
+
+  console.log("Workspace Unique ID:", workspaceId);
+  console.log("Active Document Path:", activeDocument);
+
+  return { workspaceId, activeDocument };
 };
 
 const documents: { documentName: string; lineCount: number }[] = [];
