@@ -496,6 +496,7 @@ export async function activate(context: vscode.ExtensionContext) {
             ollamaUrlChatCompletion,
             ollamaHeaders,
             document,
+            context,
             lineText ? lineText : undefined
           );
         } catch (e) {

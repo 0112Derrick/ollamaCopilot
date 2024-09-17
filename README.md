@@ -36,18 +36,27 @@ Extension supports inline suggestions from models:
 
 <!-- ![media](media/features/inlinePrompt.png) -->
 
-The app will scan your current document routinely helping to auto complete code.
+- The app will scan your current document routinely helping to auto complete code.
+- If you have an embed model set and an embed url the app will scan your current document and after 50 newlines of code is added to the current document it will re-embed that document.
+- You can drag and drop in new documents and they will be embedded as a part of your current workspace.
+- In the webview you can change the apps theme, add documents to embed, and set a custom system prompt.
 
 `Commands:`
 `Ctrl+Shift+P | CMD+Shift+P:`
 `Set Ollama Headers`
 `Set Ollama Model`
 `Set Ollama Url`
+`Reset Ollama Url | Model | Headers`
+`Ollama: uninstall`
+`Ollama workspace: Clear all saved embedded data for the current workspace.`
 
 `Right Click Commands (Highlight code):`
 `Offer a suggestion on how to improve this code.`
 `Refactor this code.`
 `Tell me about this code.`
+`Write a unit test for this code.`
+`Debug this code.`
+`Embed this code.`
 
 > Tip: Smaller models may not understand the instructions needed to have the extension work properly. Recommended model is llama3.1 or higher.
 
@@ -71,9 +80,18 @@ This extension contributes the following settings:
 
 ## Known Issues
 
+- Right clicking and prompting ollama does not always open the web view and execute the prompt on the first attempt.
+- Suggestion does not clear out after accepting it.
+
+## Uninstalling
+
+- Press Cmd + shift + p or Ctrl + shift + p type Ollama: uninstall. This will wipe all saved data by the extension. It is important to do this step before uninstalling the extension because the extension saves your embedded workspaces and vscode will not remove this data if you uninstall the app normally.
+
 ## Troubleshooting
 
-If you are getting an error it most likely means your model is not running or your extension settings are not pointed to your correct model / url.
+- If you are getting an error it most likely means your model is not running or your extension settings are not pointed to your correct model / url.
+
+- Most issues should have an error message pop up and detail the problem.
 
 ## Changelog
 

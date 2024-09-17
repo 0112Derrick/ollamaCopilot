@@ -5,6 +5,7 @@ import * as vscode from "vscode";
 import { generateChatCompletion } from "../external/ollama";
 import { removeDuplicateCode } from "../scripts";
 import { VectorDatabase } from "../scripts/interfaces";
+import { LOCAL_STORAGE_KEYS as $keys } from "../constants/LocalStorageKeys";
 
 export class inlineAiSuggestionsProvider {
   // private _lastCheckTime = 0;
@@ -13,6 +14,7 @@ export class inlineAiSuggestionsProvider {
   private debounceDelay = 3000; // 3 second delay
   private retryAttempts = 3;
   private vectorDatabase: VectorDatabase | null;
+  protected _userSystemPromptAdded: boolean = false;
   constructor(db: VectorDatabase | null) {
     this.vectorDatabase = db;
   }
@@ -74,6 +76,7 @@ export class inlineAiSuggestionsProvider {
     ollamaUrl: string,
     ollamaHeaders: string,
     document: vscode.TextDocument,
+    context: vscode.ExtensionContext,
     focusedLine?: string
   ) {
     this.debouncedQueryAI(
@@ -81,16 +84,17 @@ export class inlineAiSuggestionsProvider {
       ollamaUrl,
       ollamaHeaders,
       document,
+      context,
       focusedLine
     );
   }
 
-  //FIXME - Ai response is impartial when focusing on a single line of code.
   async queryAI(
     model: string,
     ollamaUrl: string,
     ollamaHeaders: string,
     document: vscode.TextDocument,
+    context: vscode.ExtensionContext,
     focusedLine?: string
   ) {
     console.log("\nChecking doc for boiler plate code.\n");
@@ -110,6 +114,19 @@ export class inlineAiSuggestionsProvider {
       role: "system",
       content: systemPrompt,
     });
+
+    const userSystemPrompt = context.globalState.get<string>(
+      $keys.USER_SYSTEM_PROMPT_KEY,
+      ""
+    );
+
+    if (userSystemPrompt && !this._userSystemPromptAdded) {
+      chatHistory.push({
+        role: "system",
+        content: userSystemPrompt,
+      });
+      this._userSystemPromptAdded = true;
+    }
 
     if (focusedLine) {
       chatHistory.push({
