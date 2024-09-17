@@ -4,6 +4,7 @@ import { WebViewProvider } from "./providers/webViewProvider";
 import fs from "fs/promises";
 
 import {
+  clearAllWorkspaceState,
   promptForClearWorkspaceEmbeddedData,
   promptForModel,
   promptForOllamaHeaders,
@@ -34,10 +35,10 @@ export async function activate(context: vscode.ExtensionContext) {
       await setupOllama(context);
     }
 
-    //FIXME - Vector database query does not work if the file is cleared and then reloaded.
-
     console.log("Initializing VectraDB...");
     let vectorDB: VectraDB | null = null;
+
+    getWorkSpaceId();
 
     if (ollamaEmbedURL && ollamaEmbedModel) {
       vectorDB = new VectraDB(context);
@@ -232,6 +233,31 @@ export async function activate(context: vscode.ExtensionContext) {
           $keys.VECTOR_DATABASE_KEY,
           JSON.stringify(data)
         );
+
+        let savedWorkspaces: string[] = JSON.parse(
+          context.globalState.get($keys.SAVED_WORKSPACES_KEY, "[]")
+        );
+
+        const currentWorkspace = getWorkSpaceId().workspaceId;
+
+        if (
+          savedWorkspaces &&
+          Array.isArray(savedWorkspaces) &&
+          currentWorkspace
+        ) {
+          if (!savedWorkspaces.includes(currentWorkspace)) {
+            savedWorkspaces.push(currentWorkspace);
+
+            await context.globalState.update(
+              $keys.SAVED_WORKSPACES_KEY,
+              JSON.stringify(savedWorkspaces)
+            );
+          }
+          vscode.window.showInformationMessage(
+            "Added current workspace to tracked workspaces."
+          );
+        }
+        vscode.window.showInformationMessage("Embedding workspace successful.");
         console.log("Data saved to workspaceState");
       } else {
         console.warn("No data to save from index.json");
@@ -273,6 +299,12 @@ export async function activate(context: vscode.ExtensionContext) {
           vectorDB.clearIndex();
         }
       }),
+      vscode.commands.registerCommand(
+        "ollama-copilot.clearAllSavedState",
+        () => {
+          clearAllWorkspaceState(context, webview);
+        }
+      ),
       vscode.commands.registerCommand(
         "ollama-copilot.seeSimilarQueries",
         async () => {

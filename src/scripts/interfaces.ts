@@ -47,3 +47,7 @@ export interface ModelResponse {
   eval_count: number;
   eval_duration: number;
 }
+
+export interface WebviewI {
+  clearWebviewChats: () => void;
+}

@@ -9,6 +9,7 @@ import {
   openAiEmbedModel,
 } from "../external/ollama";
 import { LOCAL_STORAGE_KEYS as $keys } from "../constants/LocalStorageKeys";
+import { WebviewI } from "./interfaces";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -319,6 +320,64 @@ export async function promptForOllamaHeaders(
         `Ollama headers set to: ${JSON.stringify(formattedHeaders)}`
       );
     }
+  }
+}
+
+export async function clearAllWorkspaceState(
+  context: vscode.ExtensionContext,
+  webview: WebviewI
+) {
+  const storedWorkspaces = JSON.parse(
+    context.globalState.get<string>($keys.SAVED_WORKSPACES_KEY, "[]")
+  );
+
+  if (!storedWorkspaces || !Array.isArray(storedWorkspaces)) {
+    vscode.window.showInformationMessage("No saved workspaces.");
+    return;
+  }
+
+  vscode.window.showWarningMessage(`This is permanent and cannot be reversed.`);
+
+  const uninstallOllamaCopilot = await vscode.window.showInputBox({
+    prompt: "Would you like to uninstall ollama copilot? ( true | False )?",
+    value: "false",
+  });
+  if (
+    uninstallOllamaCopilot &&
+    (uninstallOllamaCopilot.toLowerCase() === "t" ||
+      uninstallOllamaCopilot.toLowerCase() === "true")
+  ) {
+    for (const workspaceUri of storedWorkspaces) {
+      console.log("Workspace uri: ", workspaceUri);
+      const workspaceState = vscode.workspace.getWorkspaceFolder(
+        vscode.Uri.file(workspaceUri)
+      )?.uri;
+
+      if (workspaceState) {
+        console.log("Workspace: ", workspaceState);
+        // Remove all keys or relevant state information
+
+        context.workspaceState.update($keys.VECTOR_DATABASE_KEY, undefined);
+        context.workspaceState.update($keys.WORKSPACE_DOCUMENTS_KEY, undefined);
+
+        console.log(`Cleared workspace state for ${workspaceUri}`);
+      } else {
+        console.log("No workspace state.");
+      }
+    }
+
+    // Optionally, clear the global state tracking saved workspaces
+    webview.clearWebviewChats();
+    context.globalState.update($keys.OLLAMA_MODEL, undefined);
+    context.globalState.update($keys.IS_OPENAI_MODEL, undefined);
+    context.globalState.update($keys.OLLAMA_EMBED_MODEL, undefined);
+    context.globalState.update($keys.OLLAMA_CHAT_COMPLETION_URL, undefined);
+    context.globalState.update($keys.OLLAMA_EMBED_URL, undefined);
+    context.globalState.update($keys.OLLAMA_HEADERS, undefined);
+    context.globalState.update($keys.SAVED_WORKSPACES_KEY, undefined);
+    vscode.window.showInformationMessage(
+      "All data wiped, you can uninstall the extension now."
+    );
   }
 }
 

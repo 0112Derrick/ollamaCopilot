@@ -10,6 +10,7 @@ const LOCAL_STORAGE_KEYS = {
   VECTOR_DATABASE_KEY: "ollama_copilot_workspace_",
   WORKSPACE_DOCUMENTS_KEY: "ollama_copilot_workspace_documents",
   USER_SYSTEM_PROMPT_KEY: "ollama_copilot_user_system_prompt",
+  SAVED_WORKSPACES_KEY: "ollama_copilot_saved_workspaces",
 };
 
 for (let prop in LOCAL_STORAGE_KEYS) {

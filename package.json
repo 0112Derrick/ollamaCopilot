@@ -35,6 +35,10 @@
         "title": "Query vector database"
       },
       {
+        "command": "ollama-copilot.clearAllSavedState",
+        "title": "Ollama: Uninstall"
+      },
+      {
         "command": "ollama-copilot.clearEmbedData",
         "title": "Ollama Workspace: Clear all saved embedded data."
       },
