@@ -181,7 +181,7 @@ function reattachEventListeners() {
         }
       } else if (parentDiv.classList.contains("code-container")) {
         const code = parentDiv.children[1].textContent;
-        console.log("code: ", code);
+        // console.log("code: ", code);
         textToCopy = code ? code : "";
       }
 
@@ -223,7 +223,7 @@ async function main() {
 
   const DOM: { [key: string]: HTMLElement } = {};
 
-  console.log("Conversation container size: " + conversationsContainer.size);
+  // console.log("Conversation container size: " + conversationsContainer.size);
 
   if (!conversationsContainer) {
     console.warn("Conversation container failed to resolve.");
@@ -290,8 +290,8 @@ async function main() {
       let data = conversationsContainer.get(id);
       // console.log("conversation container: ", conversationsContainer);
       if (data) {
-        console.log("Data: " + JSON.stringify(data));
-        console.log("Label: " + data.label);
+        // console.log("Data: " + JSON.stringify(data));
+        // console.log("Label: " + data.label);
         DOM[$id.CONVERSATION].innerHTML = data.conversationHtml;
 
         queriesMade = data.queriesMade;
@@ -420,7 +420,7 @@ async function main() {
       DOM[$id.RECENT_CHATS_CONTAINER].removeChild(chatLabel);
       // recentChatsContainer.removeChild(chatLabel);
       handleCreateConversation();
-      console.log("Deleted " + uuid);
+      // console.log("Deleted " + uuid);
       saveData();
     });
     deleteButton.innerHTML = `<div class="flex-nowrap justifyCenter itemsCenter">${deleteIcon} Delete</div>`;
@@ -446,7 +446,7 @@ async function main() {
 
         let component = conversationsContainer.get(uuid);
         if (component) {
-          console.log("Updating conversation container.");
+          // console.log("Updating conversation container.");
           component.label = inputField.value;
         }
         saveData();
@@ -479,7 +479,7 @@ async function main() {
 
     if (selectedUUID) {
       if (!conversationsContainer.has(selectedUUID)) {
-        console.log("Creating a new conversation log: " + selectedUUID);
+        // console.log("Creating a new conversation log: " + selectedUUID);
         const chatLabel = createChatLabel(selectedUUID);
         DOM[$id.RECENT_CHATS_CONTAINER].appendChild(chatLabel);
         // recentChatsContainer.appendChild(chatLabel);
@@ -492,7 +492,7 @@ async function main() {
           conversationLog: [],
         });
       } else {
-        console.log("Updating conversation log: " + selectedUUID);
+        // console.log("Updating conversation log: " + selectedUUID);
         let data = conversationsContainer.get(selectedUUID);
         if (data) {
           conversationsContainer.set(selectedUUID, {
@@ -640,14 +640,14 @@ async function main() {
         });
       }
 
-      console.log("Closing side panel", event.target);
+      // console.log("Closing side panel", event.target);
       closeSidePanel();
     }
   };
 
   const saveData = (): void => {
     const saveData = JSON.stringify(conversationsContainer, replacer);
-    console.log("Saving chat history.");
+    // console.log("Saving chat history.");
     vscode.postMessage({
       command: "saveChat",
       data: saveData,
@@ -680,7 +680,7 @@ async function main() {
 
   DOM[$id.SYSTEM_PROMPT].addEventListener("input", (e) => {
     const systemPrompt = (e.target as HTMLInputElement).value;
-    console.log("Input: ", systemPrompt);
+    // console.log("Input: ", systemPrompt);
     debounceSystemPrompt(systemPrompt);
   });
 
@@ -698,12 +698,12 @@ async function main() {
         uuid = val.lastUpdatedTime;
         selectedUUID = key;
       }
-      console.log("Label set to: " + val.label);
+      // console.log("Label set to: " + val.label);
       const chatLabel = createChatLabel(key, val.label ? val.label : key);
       DOM[$id.RECENT_CHATS_CONTAINER].appendChild(chatLabel);
     }
 
-    console.log("Setting to previous conversation: " + selectedUUID);
+    // console.log("Setting to previous conversation: " + selectedUUID);
     const selectedConversation = conversationsContainer.get(selectedUUID);
     if (selectedConversation) {
       queriesMade = selectedConversation.queriesMade;
@@ -712,7 +712,7 @@ async function main() {
     }
   } else {
     selectedUUID = createUUID();
-    console.log("No previous conversations");
+    // console.log("No previous conversations");
   }
 
   /* console.log(
@@ -958,8 +958,8 @@ async function main() {
     }
 
     displayMessage(visibleMessage, "user");
-    console.log("Container ", conversationsContainer);
-    console.log(typeof conversationsContainer);
+    // console.log("Container ", conversationsContainer);
+    // console.log(typeof conversationsContainer);
     if (conversationsContainer && !conversationsContainer.has(selectedUUID)) {
       vscode.postMessage({
         command: "getLabelName",
@@ -1182,7 +1182,7 @@ async function main() {
             );
             return;
           }
-          console.log("update chat history:", selectedUUID);
+          // console.log("update chat history:", selectedUUID);
           if (conversationsContainer.has(selectedUUID)) {
             let data = conversationsContainer.get(selectedUUID);
             if (data) {
@@ -1192,10 +1192,10 @@ async function main() {
             }
           }
 
-          console.log(
+          /* console.log(
             "Conversation container pre save: ",
             conversationsContainer
-          );
+          ); */
           saveData();
           break;
         case "logError":

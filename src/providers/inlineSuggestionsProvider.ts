@@ -12,7 +12,7 @@ export class inlineAiSuggestionsProvider {
   private codingLanguage = "";
   private debounceTimer: NodeJS.Timeout | null = null;
   private debounceDelay = 3000; // 3 second delay
-  private retryAttempts = 3;
+  private retryAttempts = 5;
   private vectorDatabase: VectorDatabase | null;
   protected _userSystemPromptAdded: boolean = false;
   constructor(db: VectorDatabase | null) {
@@ -129,20 +129,29 @@ export class inlineAiSuggestionsProvider {
     }
 
     if (focusedLine) {
-      chatHistory.push({
-        role: "user",
-        content:
-          "This is for context. Other code in the document. : " +
-          document.getText(),
-      });
-
+      const surroundingText = document
+        .getText()
+        .replace(focusedLine, "")
+        .trim();
+      if (surroundingText !== "") {
+        chatHistory.push({
+          role: "user",
+          content:
+            "This is for context. Other code in the document. : " +
+            surroundingText,
+        });
+      }
       const query = `Analyze the following code and respond ONLY with a JSON object. Do not include any explanation or comments.
 
-Help me with the following code: ${focusedLine}
+${
+  focusedLine.startsWith("//")
+    ? `Follow the users instructions and complete what the user is telling you to code: ${focusedLine}`
+    : `Help me with the following code: ${focusedLine}`
+}
 
 Task:
 1. Attempt to autocomplete the next logical part.
-  a. Briefly analyze the problem you and the user are trying to solve and outline your approach to solving it.
+  a. Analyze the problem then outline your approach to solving it.
   b. Present a clear plan of steps to solve the problem.
   c. Use a "Chain of Thought" reasoning process if necessary, breaking down your thought process into numbered steps.
 4. Review your reasoning.
@@ -151,9 +160,10 @@ Task:
 5. Provide your final answer in the "code" field.
 6. Initialize all of your variables, functions, and classes using the correct syntax.
 7. Provide complete code with initializers, typings(if necessary), and assignment operators. Do not only partially fill in the users text.
+8. Check your final answer to make sure it matches what the user was looking for and is valid json. If you detect that your answer was either incorrect or not valid json then iterate on your answer.
 ${
   this.codingLanguage
-    ? `8. Code in the following language: ${this.codingLanguage}`
+    ? `9. Code in the following language: ${this.codingLanguage}`
     : ""
 }
 
@@ -166,6 +176,7 @@ Rules:
 - The "code" field should contain ONLY code, no comments or explanations.
 - For code autocompletion, provide only the next logical part, not repeating existing code.
 - Ensure the response is valid JSON.
+- Make sure you close all parenthesis and brackets to ensure your response is valid json.
 - Do not repeat any code that was provided.
 - Do not include any text outside the JSON object.
 - Provide complete answers.
@@ -175,14 +186,19 @@ Rules:
         role: "user",
         content: query,
       });
+
       if (this.vectorDatabase) {
         const similarQueries = await this.vectorDatabase.getSimilarQueries(
-          focusedLine
+          focusedLine,
+          0.25
         );
-        chatHistory.push({
-          role: "user",
-          content: `Here are similar queries. Use these queries in order to help you solve the users current query. ${similarQueries}`,
-        });
+
+        if (similarQueries.trim() !== "") {
+          chatHistory.push({
+            role: "user",
+            content: `Here are similar queries. Use these queries in order to help you solve the users current query. ${similarQueries}`,
+          });
+        }
       }
     } else {
       const query = `Analyze the following code and respond ONLY with a JSON object. Do not include any explanation or comments.
@@ -222,12 +238,14 @@ Rules:
 - Ensure the response is valid JSON.
 - Do not repeat any code that was provided.
 - Do not include any text outside the JSON object.`;
+
       chatHistory.push({
         role: "user",
         content: query,
       });
     }
-
+    console.log("Chat history: ");
+    console.log(chatHistory);
     try {
       while (retry > 0) {
         let response = await generateChatCompletion(

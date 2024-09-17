@@ -116,17 +116,17 @@ export default class VectraDB {
       if ((data as openAiResponse).data) {
         // This is an openAiResponse
         const openAiData = data as openAiResponse;
-        console.log("Here 1");
+
         // console.log(openAiData.data[0].embedding);
         return openAiData.data[0].embedding;
       } else if ((data as ollamaResponse).embeddings) {
         // This is an ollamaResponse
         const ollamaData = data as ollamaResponse;
-        console.log("Here 2");
+
         // console.log(ollamaData.embeddings[0]);
         return ollamaData.embeddings;
       }
-      console.log("Here 3");
+
       return response.data;
     } catch (error) {
       console.error("Error: " + error);
@@ -216,7 +216,6 @@ export default class VectraDB {
         return [];
       }
 
-      //FIXME - WTF query items only works after embedding data using their api not just writing to the file.
       const results = await this._index.queryItems(embeddings, matchesLimit);
       console.log("\nResults: ", results, "\n");
 
@@ -266,9 +265,10 @@ export default class VectraDB {
           score = score * -1;
         }
 
-        if (!minMatch) {
+        if (!minMatch || minMatch >= 1) {
           minMatch = 0.15;
         }
+
         let minScore = minMatch;
 
         console.log(

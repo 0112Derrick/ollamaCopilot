@@ -38,8 +38,6 @@ export async function activate(context: vscode.ExtensionContext) {
     console.log("Initializing VectraDB...");
     let vectorDB: VectraDB | null = null;
 
-    getWorkSpaceId();
-
     if (ollamaEmbedURL && ollamaEmbedModel) {
       vectorDB = new VectraDB(context);
       console.log("Creating index...");
@@ -606,6 +604,15 @@ export async function activate(context: vscode.ExtensionContext) {
 
       if (
         event.contentChanges.some((change) => {
+          const position = editor.selection.active;
+          const document = editor.document;
+          const line = document.lineAt(position.line);
+          const lineText = line.text.trim();
+          if (change.text === "\n" && lineText.startsWith("//")) {
+            vscode.window.showInformationMessage("Processing.");
+            checkAndInsertSuggestion();
+          }
+
           return (
             change.text.endsWith(".") ||
             change.text.endsWith("[") ||
