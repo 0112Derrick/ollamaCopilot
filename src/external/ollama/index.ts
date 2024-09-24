@@ -5,7 +5,7 @@ import { MessageRoles } from "../../providers/webViewProvider";
 
 export const llama3 = {
   maxToken: 4096,
-  name: "llama3",
+  name: "llama3.1",
 };
 
 export const openAIModel = {
@@ -112,7 +112,11 @@ export async function generateChatCompletion(
     //   )}`
     // );
     const response = await axios.post(url, data_, config);
-
+    console.log(
+      `Data sent to ollama: URL: ${url} \nData: ${JSON.stringify(
+        data_
+      )} \nConfig: ${JSON.stringify(config)}`
+    );
     if (typeof response.data === "string" && isValidJson(response.data)) {
       return JSON.parse(response.data);
     } else {

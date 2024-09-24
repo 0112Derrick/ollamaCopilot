@@ -163,12 +163,27 @@ export default class VectraDB {
       // Process each chunk
       for (const chunk of chunks) {
         const chunkContent = chunk.join("\n"); // Combine lines back into a string
-        const embedding = (await this.getEmbedding(chunkContent)) as number[];
-        data.push(embedding); // Aggregate the results
+        let embedding = await this.getEmbedding(chunkContent);
+        console.log(
+          "Embedding is arr: ",
+          Array.isArray(embedding),
+          " has nested arr: ",
+          Array.isArray(embedding[0])
+        );
+
+        if (Array.isArray(embedding) && Array.isArray(embedding[0])) {
+          embedding = embedding.flat();
+        }
+
+        data.push(embedding as number[]); // Aggregate the results
       }
     } else {
-      let result = (await this.getEmbedding(fileContent)) as number[];
-      data.push(result);
+      let result = await this.getEmbedding(fileContent);
+      if (Array.isArray(result) && result.length && Array.isArray(result[0])) {
+        result = result.flat();
+      }
+
+      data.push(result as number[]);
     }
 
     if (data.length === 0) {
@@ -205,9 +220,8 @@ export default class VectraDB {
 
     try {
       console.log("Embedding data.");
-      const embeddings = (await this.getEmbedding(fileContent)) as number[];
+      let embeddings = await this.getEmbedding(fileContent);
       // console.log("Embedding: ", embeddings);
-      // const embeddings = e.flat();
 
       if (embeddings.length === 0) {
         console.log(
@@ -216,7 +230,21 @@ export default class VectraDB {
         return [];
       }
 
-      const results = await this._index.queryItems(embeddings, matchesLimit);
+      console.log(
+        "Embedding is arr: ",
+        Array.isArray(embeddings),
+        " has nested arr: ",
+        Array.isArray(embeddings[0])
+      );
+
+      if (Array.isArray(embeddings[0])) {
+        embeddings = embeddings.flat();
+      }
+
+      const results = await this._index.queryItems(
+        embeddings as number[],
+        matchesLimit
+      );
       console.log("\nResults: ", results, "\n");
 
       if (debug) {
@@ -236,8 +264,6 @@ export default class VectraDB {
     try {
       await this.createIndex();
 
-      let similarQueries = `Similar queries: `;
-
       // await this.createIndex();
 
       let similarUserQueries = await this.queryVectorStore(
@@ -247,10 +273,16 @@ export default class VectraDB {
 
       const set = new Set<number>();
 
-      if (!similarUserQueries || !similarUserQueries.length) {
+      if (
+        !similarUserQueries ||
+        !similarUserQueries.length ||
+        !similarUserQueries[0]?.score
+      ) {
         console.log("No similar queries returned.");
         return "";
       }
+
+      let queries = "";
 
       similarUserQueries.forEach((vector) => {
         if (!vector) {
@@ -263,6 +295,15 @@ export default class VectraDB {
 
         if (score < 0) {
           score = score * -1;
+        }
+
+        const numString = score.toString();
+        const decimalPart = numString.split(".")[1];
+
+        // Check if there are exactly 3 decimal places
+        if (decimalPart && decimalPart.length >= 3) {
+          console.log("Boosting all scores by 100%");
+          score = score * 10;
         }
 
         if (!minMatch || minMatch >= 1) {
@@ -291,10 +332,13 @@ export default class VectraDB {
             `\nScore: [${vector.score}] File content: ${vector.item.metadata.content} File path: ${vector.item.metadata.filePath}\n`
           );
 
-          similarQueries += `File content: ${vector.item.metadata.content}, File path: ${vector.item.metadata.filePath} `;
+          queries += `File content: ${vector.item.metadata.content}, File path: ${vector.item.metadata.filePath} `;
         }
       });
-
+      let similarQueries = "";
+      if (queries) {
+        similarQueries += "Similar queries: " + queries;
+      }
       return similarQueries;
     } catch (error) {
       console.error(

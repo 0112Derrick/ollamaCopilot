@@ -12,13 +12,33 @@ app.get("/", async (req, res) => {
 });
 
 app.post(
-  ("/forward",
+  ("/chat",
   async (req, res) => {
     try {
       const data = req.body;
 
       const response = await axios.post(
         "http://127.0.0.1:11434/api/chat",
+        data
+      );
+      res.json(response.data);
+    } catch (e) {
+      console.error("Error forwarding request", e.message);
+      res
+        .status(500)
+        .json({ error: "An error occurred while forwarding the request." });
+    }
+  })
+);
+
+app.post(
+  ("/embed",
+  async (req, res) => {
+    try {
+      const data = req.body;
+
+      const response = await axios.post(
+        "http://127.0.0.1:11434/api/embed",
         data
       );
       res.json(response.data);

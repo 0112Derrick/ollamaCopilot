@@ -31,10 +31,6 @@
         "title": "Reset Ollama: Model | URL | Headers."
       },
       {
-        "command": "ollama-copilot.seeSimilarQueries",
-        "title": "Query vector database"
-      },
-      {
         "command": "ollama-copilot.clearAllSavedState",
         "title": "Ollama: Uninstall"
       },

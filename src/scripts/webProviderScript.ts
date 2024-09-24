@@ -372,6 +372,7 @@ async function main() {
 
     DOM[$id.SEARCH_BAR].style.height = "";
     (DOM[$id.SEND_BUTTON] as HTMLButtonElement).style.boxShadow = "";
+    DOM[$id.SEARCH_BAR].style.overflowY = "";
   };
 
   const createChatLabel = (id: string, _labelName?: string) => {
@@ -382,7 +383,6 @@ async function main() {
       handleRecentChatClicked(uuid);
     });
 
-    //FIXME - Add Rename option.
     const labelName = document.createElement("div");
     labelName.innerText = _labelName || uuid;
     labelName.className = "labelName";
@@ -674,14 +674,18 @@ async function main() {
   const debounceSystemPrompt = debounce((systemPrompt: string) => {
     vscode.postMessage({
       command: "saveUserSystemPrompt",
-      systemPrompt: systemPrompt,
+      systemPrompt: systemPrompt || "",
     });
   }, 3000);
 
   DOM[$id.SYSTEM_PROMPT].addEventListener("input", (e) => {
     const systemPrompt = (e.target as HTMLInputElement).value;
-    // console.log("Input: ", systemPrompt);
-    debounceSystemPrompt(systemPrompt);
+    if (systemPrompt.trim() === "") {
+      console.log("Input cleared");
+      debounceSystemPrompt(systemPrompt); // Call your debounce function
+    } else {
+      debounceSystemPrompt(systemPrompt);
+    }
   });
 
   setTheme(await ollamaThemePreference);
@@ -780,6 +784,17 @@ async function main() {
   DOM[$id.THEME_TOGGLE_ROSE_GOLD].addEventListener("click", switchToggle);
   DOM[$id.THEME_TOGGLE_HIGH_CONTRAST].addEventListener("click", switchToggle);
   DOM[$id.THEME_TOGGLE_POKEMON_THEME].addEventListener("click", switchToggle);
+  // Helper function to calculate the rendered width of the text
+  function getTextWidth(text: string, font: string) {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) {
+      return;
+    }
+    context.font = font; // Use the same font as the textarea
+    const metrics = context.measureText(text);
+    return metrics.width;
+  }
 
   DOM[$id.SEARCH_BAR].addEventListener("input", (e) => {
     if (!e.target) {
@@ -789,12 +804,24 @@ async function main() {
     if (searchBar.value.length > 0 && searchBar.value.trim() !== "") {
       activateSendButton();
 
-      if (isOverflown(searchBar)) {
+      const textLength = getTextWidth(
+        searchBar.value,
+        getComputedStyle(searchBar).font
+      );
+
+      const searchBarWidth = searchBar.clientWidth;
+
+      if (
+        isOverflown(searchBar) &&
+        textLength &&
+        textLength > 0.8 * searchBarWidth
+      ) {
         const currentHeight = parseInt(getComputedStyle(searchBar).height, 10);
         // Increase height by 28px while respecting max-height in CSS
         searchBar.style.height =
           Math.min(currentHeight + 28, window.innerHeight * 0.25) + "px";
       }
+
       if (
         parseInt(getComputedStyle(searchBar).height, 10) >
         window.innerHeight * 0.24
@@ -917,6 +944,7 @@ async function main() {
 
   function promptAI(message: string, contextMessage?: string) {
     deactivateSendButton();
+    closeSettingsMenu();
 
     if (queriesMade === 0) {
       DOM[$id.CONVERSATION].innerHTML = "";
@@ -925,7 +953,11 @@ async function main() {
 
     queriesMade++;
 
-    let query = message + " " + contextMessage;
+    let query = message;
+    if (contextMessage) {
+      query += " " + contextMessage;
+    }
+
     let visibleMessage = message;
     if (documentsAppendedToQuery.length) {
       if (query.trim() === "") {
@@ -1054,7 +1086,12 @@ async function main() {
           if (part.trim()) {
             const textContainer = document.createElement("div");
             textContainer.className = "text-container";
-            textContainer.innerText = part.trim();
+            const highlightedText = part.replace(
+              /`([^`]+)`/g,
+              '<span class="highlightText">$1</span>'
+            );
+            textContainer.innerHTML = highlightedText.trim();
+            // textContainer.innerText = part.trim();
             aiMessage.appendChild(textContainer);
           }
         } else {
@@ -1086,7 +1123,11 @@ async function main() {
       updateConversationContainer();
     } else {
       // If no code block, display the entire response as regular text
-      displayMessage(aiResponse, "ai");
+      const highlightedText = aiResponse.replace(
+        /`([^`]+)`/g,
+        '<span class="highlightText">$1</span>'
+      );
+      displayMessage(highlightedText, "ai");
     }
 
     // Hide loading indicator

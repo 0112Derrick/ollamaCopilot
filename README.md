@@ -66,7 +66,7 @@ A working server that will listen to post commands at the set url. This server s
 
 By default the app will listen to `http://localhost:11434/api/generate` because this is the default port of Ollama.
 
-By default the app will use `llama3` for the model name in the request.
+By default the app will use `llama3.1` for the model name in the request.
 
 ## Extension Settings
 
@@ -75,13 +75,16 @@ By default the app will use `llama3` for the model name in the request.
 This extension contributes the following settings:
 
 - `Set Ollama URL`: Sets where the api request will go to. This is useful if you want to host the model on a separate machine or use a server in the middle of your requests. By default set to `http://localhost:11434/api/generate`
-- `Set Ollama Model`: Sets the model name included in the request. By default set to: `llama3`
+- `Set Ollama Model`: Sets the model name included in the request. By default set to: `llama3.1`
 - `Set Ollama Headers`: Sets the api headers sent in the post request during queries.
+
+> If you switch your embedding model it is recommended to also re-embed your workspace for the best results.
 
 ## Known Issues
 
 - Right clicking and prompting ollama does not always open the web view and execute the prompt on the first attempt.
 - Suggestion does not clear out after accepting it.
+- Graphical issue with the webview prompt bar.
 
 ## Uninstalling
 

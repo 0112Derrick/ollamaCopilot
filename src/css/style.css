@@ -619,6 +619,10 @@ body {
   width: 100%;
 }
 
+.h-full {
+  width: 100%;
+}
+
 .flex-col {
   flex-direction: column;
 }
@@ -673,6 +677,13 @@ body {
 
 .mb-1 {
   margin-bottom: 0.5rem;
+}
+
+.highlightText {
+  background-color: #f0f0f088;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: monospace;
 }
 
 .promptSuggestions {

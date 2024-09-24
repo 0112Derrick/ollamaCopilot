@@ -15,7 +15,11 @@ import {
 
 import InlineCompletionProvider from "./providers/inlineCompletionProvider";
 import { inlineAiSuggestionsProvider } from "./providers/inlineSuggestionsProvider";
-import { analyzeWorkspaceDocuments, getWorkSpaceId } from "./utils/workspace";
+import {
+  analyzeWorkspaceDocuments,
+  checkForTestingPackages,
+  getWorkSpaceId,
+} from "./utils/workspace";
 import { LOCAL_STORAGE_KEYS as $keys } from "./constants/LocalStorageKeys";
 import VectraDB from "./db/vectorDB";
 import path from "path";
@@ -304,19 +308,6 @@ export async function activate(context: vscode.ExtensionContext) {
         }
       ),
       vscode.commands.registerCommand(
-        "ollama-copilot.seeSimilarQueries",
-        async () => {
-          const query = await vscode.window.showInputBox({
-            prompt: "Enter query.",
-            value: "",
-          });
-
-          if (vectorDB && query) {
-            console.log("result: ", vectorDB.getSimilarQueries(query));
-          }
-        }
-      ),
-      vscode.commands.registerCommand(
         "ollama-copilot.resetStoredValues",
         () => {
           resetStoredValues(context);
@@ -351,10 +342,10 @@ export async function activate(context: vscode.ExtensionContext) {
         const selectedText = editor.document.getText(selection);
 
         if (selectedText) {
+          await vscode.commands.executeCommand("ollamaView.focus");
           vscode.window.showInformationMessage(
             `Selected text: ${selectedText}`
           );
-          await vscode.commands.executeCommand("ollamaView.focus");
           webview.promptAI(prompt + selectedText);
         } else {
           vscode.window.showInformationMessage("No text selected.");
@@ -375,11 +366,22 @@ export async function activate(context: vscode.ExtensionContext) {
           "What is the best design pattern for this use case? "
         );
       }),
-      vscode.commands.registerCommand("ollama-copilot.writeAUnitTest", () => {
-        promptModelWithPreWrittenQuery(
-          "Write a unit tests for this function: "
-        );
-      }),
+      vscode.commands.registerCommand(
+        "ollama-copilot.writeAUnitTest",
+        async () => {
+          const result = await checkForTestingPackages();
+          let prompt = "";
+          let path = getWorkSpaceId().activeDocument;
+
+          if (result) {
+            prompt += `Write a unit test for the following function using this unit testing library: ${result}; File path ${path}; Function: `;
+          } else {
+            prompt += `File path:${path}; Write unit tests for this function: `;
+          }
+          // let prompt = "Write unit tests for this function: ";
+          promptModelWithPreWrittenQuery(prompt);
+        }
+      ),
       vscode.commands.registerCommand("ollama-copilot.debugTheCode", () => {
         promptModelWithPreWrittenQuery("Debug this code: ");
       }),
