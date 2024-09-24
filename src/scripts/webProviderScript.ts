@@ -1,50 +1,74 @@
 import { isValidJson } from "../utils";
+import {
+  deleteIcon,
+  closeSvgIcon,
+  ellipsesSvg,
+  copySvgIcon,
+  editSvgIcon,
+} from "../svgs";
+import { MessageRoles } from "../providers/webViewProvider";
+import { HTML_IDS as $id } from "../constants/HTMLElementIds";
+import {
+  reviver,
+  MissingElementError,
+  createUUID,
+  addEventListenerToClass,
+  replacer,
+  isOverflown,
+} from "./utils";
+import { ChatContainer, OllamaWebviewThemes } from "./interfaces";
 
 declare function acquireVsCodeApi(): {
   postMessage: (message: any) => void;
   getState: () => any;
   setState: (newState: any) => void;
 };
+
 const vscode = acquireVsCodeApi();
 
-function replacer(key: string, value: any) {
-  if (value instanceof Map) {
-    return {
-      dataType: "Map",
-      value: Array.from(value.entries()), // Convert Map to array of key-value pairs
-    };
-  } else {
-    return value;
-  }
-}
+let ollamaImgPromise: Promise<string>;
+let ollamaChatHistoryPromise: Promise<ChatContainer>;
+let ollamaThemePreference: Promise<OllamaWebviewThemes>;
+let ollamaUserSystemPrompt: Promise<string>;
 
-function reviver(key: string, value: any) {
-  if (typeof value === "object" && value !== null) {
-    if (value.dataType === "Map") {
-      return new Map(value.value); // Convert back to Map from array of key-value pairs
-    }
-  }
-  return value;
-}
+const createPromises = () => {
+  let resolveImage: (value: string) => void;
+  let resolveChatHistory: (value: ChatContainer) => void;
+  let resolveThemePreference: (value: OllamaWebviewThemes) => void;
+  let resolveSystemPrompt: (value: string) => void;
 
-let ollamaImgPromise: Promise<string> = new Promise((resolve) => {
+  ollamaImgPromise = new Promise((resolve) => {
+    resolveImage = resolve;
+  });
+
+  ollamaChatHistoryPromise = new Promise((resolve) => {
+    resolveChatHistory = resolve;
+  });
+
+  ollamaThemePreference = new Promise((resolve) => {
+    resolveThemePreference = resolve;
+  });
+
+  ollamaUserSystemPrompt = new Promise((resolve) => {
+    resolveSystemPrompt = resolve;
+  });
+
   window.addEventListener("message", (event) => {
     const message = event.data;
-    if (message.command === "setImageUri") {
-      resolve(message.imageUri);
-    }
-  });
-});
-
-let ollamaChatHistoryPromise: Promise<ChatContainer> = new Promise(
-  (resolve) => {
-    window.addEventListener("message", (event) => {
-      const message = event.data;
-      if (message.command === "setChatHistory") {
+    switch (message.command) {
+      case "setThemePreference":
+        resolveThemePreference(message.theme);
+        break;
+      case "setImageUri":
+        resolveImage(message.imageUri);
+        break;
+      case "setChatHistory":
+        try {
+        } catch (e) {}
         if (isValidJson(message.data)) {
-          resolve(JSON.parse(message.data, reviver));
+          resolveChatHistory(JSON.parse(message.data, reviver));
         } else {
-          resolve(
+          resolveChatHistory(
             new Map<
               string,
               {
@@ -57,48 +81,43 @@ let ollamaChatHistoryPromise: Promise<ChatContainer> = new Promise(
             >()
           );
         }
-      }
-    });
-  }
-);
-
-function getCurrentDate() {
-  const now = new Date();
-
-  const year = now.getFullYear(); // 4-digit year
-  const month = String(now.getMonth() + 1).padStart(2, "0"); // 2-digit month (0-based, so +1)
-  const day = String(now.getDate()).padStart(2, "0"); // 2-digit day
-
-  return `${year}-${month}-${day}`;
-}
-
-function createUUID() {
-  let uuid = getCurrentDate() + Date.now();
-  return uuid;
-}
-
-const addEventListenerToClass = (
-  className: string,
-  eventType: string,
-  action: any
-) => {
-  document.querySelectorAll(className).forEach((elem) => {
-    elem.addEventListener(eventType, action);
+        break;
+      case "setUserSystemPrompt":
+        resolveSystemPrompt(message.systemPrompt);
+        break;
+    }
   });
 };
+createPromises();
+
+const sendSignalOnLoad = () => {
+  window.addEventListener("load", () => {
+    vscode.postMessage({ command: "webviewReady" });
+  });
+};
+
+sendSignalOnLoad();
 
 /*  
 Re-add code container copy button
 */
 function reattachEventListeners() {
-  const copyButtons: NodeListOf<HTMLElement> = document.querySelectorAll(
+  const _copyButtons: NodeListOf<HTMLElement> = document.querySelectorAll(
     ".clipboard-icon-messages"
   );
+
+  const _codeContainerCopyButtons: NodeListOf<HTMLElement> =
+    document.querySelectorAll(".clipboard-icon");
+
+  const copyButtons: HTMLElement[] = [
+    ...Array.from(_copyButtons),
+    ...Array.from(_codeContainerCopyButtons),
+  ];
 
   copyButtons.forEach((button) => {
     button.addEventListener("click", (event) => {
       const parentDiv = (event.target as HTMLElement).closest(
-        ".user-message, .ai-message"
+        ".user-message, .ai-message, .code-container"
       );
 
       if (!parentDiv) {
@@ -115,13 +134,55 @@ function reattachEventListeners() {
           ? userMessage.children[1].textContent
           : "";
       } else if (parentDiv.classList.contains("ai-message")) {
-        const aiMessage = parentDiv.querySelector(".flex-nowrap");
-        if (!aiMessage) {
-          return;
+        const codeContainer = parentDiv.querySelector(".code-container");
+
+        // Default case: No code-container, copy from .flex-nowrap
+        if (!codeContainer) {
+          const aiMessage = parentDiv.querySelector(".flex-nowrap");
+          if (aiMessage && aiMessage.children[1]) {
+            textToCopy = aiMessage.children[1].textContent || "";
+          }
         }
-        textToCopy = aiMessage.children[1].textContent
-          ? aiMessage.children[1].textContent
-          : "";
+
+        // Special case: AI message with code-container
+        else {
+          /* 
+          3 options:
+           Pre-code-container + code-container + post-code-container
+           Pre-code-container + code-container
+           code-container + post-code-container
+
+           -- in order to get the text from pre-code-container I need to access its inner child and select the inner child's the 2nd element.
+
+           -- in order to get the text from the code container I need to access code-container and then get the text from the pre element.
+
+           -- in order to get the text from post code container i need to get its inner html
+          */
+          const preCodeContainer = parentDiv.querySelector(
+            ".pre-code-container"
+          );
+          const codeElement = parentDiv.querySelector(".code-container pre");
+          const postCodeContainer = parentDiv.querySelector(
+            ".post-code-container"
+          );
+
+          if (preCodeContainer && preCodeContainer.children[0].children[1]) {
+            textToCopy +=
+              preCodeContainer.children[0].children[1].textContent + "\n" || "";
+          }
+
+          if (codeElement) {
+            textToCopy += codeElement.textContent + "\n" || "";
+          }
+
+          if (postCodeContainer) {
+            textToCopy += postCodeContainer.textContent + "/n" || "";
+          }
+        }
+      } else if (parentDiv.classList.contains("code-container")) {
+        const code = parentDiv.children[1].textContent;
+        // console.log("code: ", code);
+        textToCopy = code ? code : "";
       }
 
       navigator.clipboard
@@ -136,40 +197,7 @@ function reattachEventListeners() {
   });
 }
 
-type userMessageRole = "user";
-type toolMessageRole = "tool";
-type assistantMessageRole = "assistant";
-type systemMessageRole = "system";
-
-type MessageRoles =
-  | userMessageRole
-  | toolMessageRole
-  | assistantMessageRole
-  | systemMessageRole;
-
-type ChatContainer = Map<
-  string,
-  {
-    lastUpdatedTime: number;
-    conversationHtml: string;
-    conversationLog: { role: MessageRoles; content: string }[];
-    label: string;
-    queriesMade: number;
-  }
->;
-
-const deleteIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0"> <path fill-rule="evenodd" clip-rule="evenodd" d="M10.5555 4C10.099 4 9.70052 4.30906 9.58693 4.75114L9.29382 5.8919H14.715L14.4219 4.75114C14.3083 4.30906 13.9098 4 13.4533 4H10.5555ZM16.7799 5.8919L16.3589 4.25342C16.0182 2.92719 14.8226 2 13.4533 2H10.5555C9.18616 2 7.99062 2.92719 7.64985 4.25342L7.22886 5.8919H4C3.44772 5.8919 3 6.33961 3 6.8919C3 7.44418 3.44772 7.8919 4 7.8919H4.10069L5.31544 19.3172C5.47763 20.8427 6.76455 22 8.29863 22H15.7014C17.2354 22 18.5224 20.8427 18.6846 19.3172L19.8993 7.8919H20C20.5523 7.8919 21 7.44418 21 6.8919C21 6.33961 20.5523 5.8919 20 5.8919H16.7799ZM17.888 7.8919H6.11196L7.30423 19.1057C7.3583 19.6142 7.78727 20 8.29863 20H15.7014C16.2127 20 16.6417 19.6142 16.6958 19.1057L17.888 7.8919ZM10 10C10.5523 10 11 10.4477 11 11V16C11 16.5523 10.5523 17 10 17C9.44772 17 9 16.5523 9 16V11C9 10.4477 9.44772 10 10 10ZM14 10C14.5523 10 15 10.4477 15 11V16C15 16.5523 14.5523 17 14 17C13.4477 17 13 16.5523 13 16V11C13 10.4477 13.4477 10 14 10Z" fill="currentColor"></path></svg>`;
-
-const ellipsesSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-md"><path fill-rule="evenodd" clip-rule="evenodd" d="M3 12C3 10.8954 3.89543 10 5 10C6.10457 10 7 10.8954 7 12C7 13.1046 6.10457 14 5 14C3.89543 14 3 13.1046 3 12ZM10 12C10 10.8954 10.8954 10 12 10C13.1046 10 14 10.8954 14 12C14 13.1046 13.1046 14 12 14C10.8954 14 10 13.1046 10 12ZM17 12C17 10.8954 17.8954 10 19 10C20.1046 10 21 10.8954 21 12C21 13.1046 20.1046 14 19 14C17.8954 14 17 13.1046 17 12Z" fill="currentColor"></path><span class="tooltiptext">Options</span></svg>`;
-
-const closeSvgIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-sm"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.63603 5.63604C6.02656 5.24552 6.65972 5.24552 7.05025 5.63604L12 10.5858L16.9497 5.63604C17.3403 5.24552 17.9734 5.24552 18.364 5.63604C18.7545 6.02657 18.7545 6.65973 18.364 7.05025L13.4142 12L18.364 16.9497C18.7545 17.3403 18.7545 17.9734 18.364 18.364C17.9734 18.7545 17.3403 18.7545 16.9497 18.364L12 13.4142L7.05025 18.364C6.65972 18.7545 6.02656 18.7545 5.63603 18.364C5.24551 17.9734 5.24551 17.3403 5.63603 16.9497L10.5858 12L5.63603 7.05025C5.24551 6.65973 5.24551 6.02657 5.63603 5.63604Z" fill="currentColor"></path></svg>`;
-
-const copySvgIcon = `<?xml version="1.0" encoding="utf-8"?>
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M6 11C6 8.17157 6 6.75736 6.87868 5.87868C7.75736 5 9.17157 5 12 5H15C17.8284 5 19.2426 5 20.1213 5.87868C21 6.75736 21 8.17157 21 11V16C21 18.8284 21 20.2426 20.1213 21.1213C19.2426 22 17.8284 22 15 22H12C9.17157 22 7.75736 22 6.87868 21.1213C6 20.2426 6 18.8284 6 16V11Z" stroke="currentColor" stroke-width="1.5"/>
-<path d="M6 19C4.34315 19 3 17.6569 3 16V10C3 6.22876 3 4.34315 4.17157 3.17157C5.34315 2 7.22876 2 11 2H15C16.6569 2 18 3.34315 18 5" stroke="currentColor" stroke-width="1.5"/>
-</svg>`;
-
+//Requests data from the extension on load.
 const requestData = () => {
   vscode.postMessage({
     command: "requestImageUri",
@@ -178,6 +206,14 @@ const requestData = () => {
   vscode.postMessage({
     command: "getChat",
   });
+
+  vscode.postMessage({
+    command: "getThemePreference",
+  });
+
+  vscode.postMessage({
+    command: "getUserSystemPrompt",
+  });
 };
 
 requestData();
@@ -185,7 +221,9 @@ requestData();
 async function main() {
   const conversationsContainer: ChatContainer = await ollamaChatHistoryPromise;
 
-  console.log("Map: ", conversationsContainer);
+  const DOM: { [key: string]: HTMLElement } = {};
+
+  // console.log("Conversation container size: " + conversationsContainer.size);
 
   if (!conversationsContainer) {
     console.warn("Conversation container failed to resolve.");
@@ -193,62 +231,53 @@ async function main() {
   }
 
   const ollamaImg = await ollamaImgPromise;
-  console.log(`\nImg: , ${ollamaImg}\n`);
+
+  const userSystemPrompt = await ollamaUserSystemPrompt;
 
   let selectedUUID = "";
-  let documentsAppendedToQuery: any[] = [];
+  let documentsAppendedToQuery: {
+    fileName: string;
+    fileContent: string;
+    filePath: string;
+  }[] = [];
+  let documentsToEmbed: {
+    fileName: string;
+    fileContent: string;
+    filePath: string;
+  }[] = [];
   let queriesMade: number = 0;
+  //create html element objects using the values from the html_ids file and
 
-  const sendButton = document.querySelector("#sendButton") as HTMLButtonElement;
-  const userQuery: HTMLInputElement = document.querySelector(
-    "#userQuery"
-  ) as HTMLInputElement;
+  for (let elem_id in $id) {
+    let elem = document.getElementById($id[elem_id as keyof typeof $id]);
+    if (elem) {
+      let e: string = $id[elem_id as keyof typeof $id];
+      DOM[e] = elem;
+    } else {
+      throw new MissingElementError(
+        `Element id ${$id}: ${$id[elem_id as keyof typeof $id]} not found!`
+      );
+    }
+  }
 
-  const loadingIndicator: HTMLInputElement = document.querySelector(
-    "#loadingIndicator"
-  ) as HTMLInputElement;
-
-  const closeButton: HTMLElement = document.querySelector(
-    "#sideBarCloseButton"
-  ) as HTMLElement;
-
-  const openSidePanelBtn = document.querySelector(
-    "#openSidePanelBtn"
-  ) as HTMLInputElement;
-  const conversation = document.querySelector(
-    "#conversation"
-  ) as HTMLInputElement;
-  const recentChatsContainer = document.querySelector(
-    "#chatsContainer"
-  ) as HTMLInputElement;
-  const documentsContainer = document.querySelector(
-    "#appendedDocumentsContainer"
-  ) as HTMLDivElement;
-  const newChatWindowButton = document.querySelector(
-    "#newChatButton"
-  ) as HTMLElement;
-  const addFileButton = document.querySelector("#addFileButton") as HTMLElement;
-  const container = document.querySelector(".container") as HTMLElement;
-  const settingsButton = document.querySelector(
-    "#settingsButton"
-  ) as HTMLElement;
-  const settingMenuCloseButton = document.querySelector(
-    "#settingMenuCloseButton"
-  ) as HTMLElement;
-  const themeToggle = document.querySelector("#themeToggle") as HTMLElement;
-
-  // console.log("\nOllama img\n", ollamaImg);
   const initialConversationView = `
         <img id="ollamaImg" src=${ollamaImg} alt="Ollama"/>
-        <div class="flex suggestionsContainer">
+        <div class="suggestionsContainer">
           <div class="promptSuggestions">Code a stop watch.</div>
           <div class="promptSuggestions">List 5 projects for an intermediate developer.</div>
-          <div class="promptSuggestions">Text inviting a friend to a wedding.</div>
           <div class="promptSuggestions">Python script for daily email reports.</div>
+          <div class="promptSuggestions" data-options>Options.</div>
         </div>`;
 
+  const optionsString = `"This is additional information related to this query: Ollama copilot can help auto complete code using inline suggestions. You can highlight code and right click to use pre-created prompts for refactoring, understanding, and improving code. To switch your model use ctrl + shft + p or cmd + shft + p on mac and type ollama to view settings about switching your model, hosted machine, or setting up headers. Ollama copilot can be connected to OpenAi by setting their headers in accordance to what OpenAI expects and setting their url/model to what openAI expects. Tell the user about these capabilities. You are Ollama Copilot so talk in first person about your capabilities and do it concisely."`;
+  const options_connectingToOpenAI = `
+   Set your headers my clicking ctrl+shift+p or cmd+shift+p for mac type ollama Set Ollama Headers set it to: {"Authorization":"Bearer *Your token here*"}
+   Set your url following the same steps as before and go to Set ollama url, set the value to: https://api.openai.com/v1/chat/completions or whatever the current documentation says for connecting to OpenAi chat completions.
+   Lastly set your model following the same steps as before and set it to a chatgpt model.
+   `;
+
   const handleRecentChatClicked = (id: string) => {
-    if (!conversation || !conversationsContainer) {
+    if (!conversationsContainer) {
       return;
     }
     /*
@@ -257,15 +286,16 @@ async function main() {
     Set queriesMade
     */
     if (id !== selectedUUID) {
-      console.log("Clicked");
-      console.log("selected uuid: ", id);
+      // console.log("selected uuid: ", id);
       let data = conversationsContainer.get(id);
-      console.log("conversation container: ", conversationsContainer);
+      // console.log("conversation container: ", conversationsContainer);
       if (data) {
-        console.log("Data: " + JSON.stringify(data));
-        console.log("Label: " + data.label);
-        conversation.innerHTML = data.conversationHtml;
+        // console.log("Data: " + JSON.stringify(data));
+        // console.log("Label: " + data.label);
+        DOM[$id.CONVERSATION].innerHTML = data.conversationHtml;
+
         queriesMade = data.queriesMade;
+        selectedUUID = id;
         //NOTE - Update the conversation log in the app.
         vscode.postMessage({
           command: "setChatHistory",
@@ -276,16 +306,20 @@ async function main() {
   };
 
   const handleCreateConversation = () => {
-    if (!conversation) {
-      return;
-    }
     selectedUUID = createUUID();
     queriesMade = 0;
-    conversation.style.justifyContent = "center";
-    conversation.innerHTML = initialConversationView;
+    DOM[$id.CONVERSATION].style.justifyContent = "center";
+    DOM[$id.CONVERSATION].innerHTML = initialConversationView;
 
     addEventListenerToClass(".promptSuggestions", "click", (e: MouseEvent) => {
-      promptAI((e.target as HTMLDivElement).innerHTML);
+      const elem = e.target as HTMLDivElement;
+
+      if (elem.hasAttribute("data-options")) {
+        promptAI((e.target as HTMLDivElement).innerHTML, optionsString);
+      } else {
+        promptAI((e.target as HTMLDivElement).innerHTML);
+      }
+      // promptAI((e.target as HTMLDivElement).innerHTML);
     });
 
     vscode.postMessage({
@@ -294,37 +328,51 @@ async function main() {
   };
 
   const handleMouseEnter = () => {
-    sendButton.style.background = "#d8d8d8";
-    sendButton.style.boxShadow = "3px 3px 5px #717171";
+    DOM[$id.SEND_BUTTON].style.background = "#d8d8d8";
+    DOM[$id.SEND_BUTTON].style.boxShadow = "3px 3px 5px #717171";
   };
 
   const handleMouseLeave = () => {
-    sendButton.style.background = "#fff";
-    sendButton.style.boxShadow = "";
+    DOM[$id.SEND_BUTTON].style.background = "#fff";
+    DOM[$id.SEND_BUTTON].style.boxShadow = "";
   };
 
   const activateSendButton = () => {
-    if (!sendButton) {
-      return;
-    }
-    sendButton.disabled = false;
-    sendButton.style.background = "#fff";
-    sendButton.style.color = "#000";
-    sendButton.style.cursor = "pointer";
-    sendButton.addEventListener("mouseenter", handleMouseEnter);
-    sendButton.addEventListener("mouseleave", handleMouseLeave);
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).disabled = false;
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).style.background = "#fff";
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).style.color = "#000";
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).style.cursor = "pointer";
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).addEventListener(
+      "mouseenter",
+      handleMouseEnter
+    );
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).addEventListener(
+      "mouseleave",
+      handleMouseLeave
+    );
   };
 
   const deactivateSendButton = () => {
-    if (!sendButton) {
-      return;
-    }
-    sendButton.disabled = true;
-    sendButton.style.background = "#bebebe";
-    sendButton.style.color = "#00000027";
-    sendButton.style.cursor = "auto";
-    sendButton.removeEventListener("mouseenter", handleMouseEnter);
-    sendButton.removeEventListener("mouseleave", handleMouseLeave);
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).disabled = true;
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).style.background = "#bebebe";
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).style.color = "#00000027";
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).style.cursor = "auto";
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).removeEventListener(
+      "mouseenter",
+      handleMouseEnter
+    );
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).removeEventListener(
+      "mouseleave",
+      handleMouseLeave
+    );
+  };
+
+  const resetUserQuery = () => {
+    (DOM[$id.SEARCH_BAR] as HTMLInputElement).value = "";
+
+    DOM[$id.SEARCH_BAR].style.height = "";
+    (DOM[$id.SEND_BUTTON] as HTMLButtonElement).style.boxShadow = "";
+    DOM[$id.SEARCH_BAR].style.overflowY = "";
   };
 
   const createChatLabel = (id: string, _labelName?: string) => {
@@ -335,7 +383,6 @@ async function main() {
       handleRecentChatClicked(uuid);
     });
 
-    //FIXME - Add Rename option.
     const labelName = document.createElement("div");
     labelName.innerText = _labelName || uuid;
     labelName.className = "labelName";
@@ -370,41 +417,86 @@ async function main() {
     const deleteButton = document.createElement("button");
     deleteButton.addEventListener("click", () => {
       conversationsContainer.delete(uuid);
-      recentChatsContainer.removeChild(chatLabel);
+      DOM[$id.RECENT_CHATS_CONTAINER].removeChild(chatLabel);
+      // recentChatsContainer.removeChild(chatLabel);
       handleCreateConversation();
-      console.log("Deleted " + uuid);
-      //FIXME - add save
+      // console.log("Deleted " + uuid);
+      saveData();
     });
     deleteButton.innerHTML = `<div class="flex-nowrap justifyCenter itemsCenter">${deleteIcon} Delete</div>`;
+
+    const editButton = document.createElement("button");
+    editButton.addEventListener("click", (e) => {
+      e.stopPropagation();
+      labelOption.classList.remove("active");
+      // chatLabel.innerHTML = "";
+      const inputField = document.createElement("input");
+      inputField.type = "text";
+      inputField.value = labelName.innerText;
+
+      const handleSubmit = () => {
+        labelName.innerText = inputField.value;
+        try {
+          if (labelName.contains(inputField)) {
+            labelName.removeChild(inputField);
+          }
+        } catch (e) {
+          console.log(e);
+        }
+
+        let component = conversationsContainer.get(uuid);
+        if (component) {
+          // console.log("Updating conversation container.");
+          component.label = inputField.value;
+        }
+        saveData();
+      };
+
+      inputField.addEventListener("blur", handleSubmit);
+      inputField.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+          handleSubmit();
+        }
+      });
+
+      labelName.appendChild(inputField);
+      inputField.focus();
+    });
+
+    editButton.innerHTML = `<div class="flex-nowrap justifyCenter itemsCenter">${editSvgIcon} Edit</div>`;
+
     menu.appendChild(deleteButton);
+    menu.appendChild(editButton);
     labelOption.appendChild(menu);
     chatLabel.appendChild(labelOption);
     return chatLabel;
   };
 
   const updateConversationContainer = () => {
-    if (!conversation || !recentChatsContainer || !conversationsContainer) {
+    if (!conversationsContainer) {
       return;
     }
 
     if (selectedUUID) {
       if (!conversationsContainer.has(selectedUUID)) {
-        console.log("Creating a new conversation log: " + selectedUUID);
+        // console.log("Creating a new conversation log: " + selectedUUID);
         const chatLabel = createChatLabel(selectedUUID);
-        recentChatsContainer.appendChild(chatLabel);
+        DOM[$id.RECENT_CHATS_CONTAINER].appendChild(chatLabel);
+        // recentChatsContainer.appendChild(chatLabel);
+
         conversationsContainer.set(selectedUUID, {
-          conversationHtml: conversation.innerHTML,
+          conversationHtml: DOM[$id.CONVERSATION].innerHTML,
           lastUpdatedTime: Date.now(),
           label: selectedUUID,
           queriesMade: queriesMade,
           conversationLog: [],
         });
       } else {
-        console.log("Updating conversation log: " + selectedUUID);
+        // console.log("Updating conversation log: " + selectedUUID);
         let data = conversationsContainer.get(selectedUUID);
         if (data) {
           conversationsContainer.set(selectedUUID, {
-            conversationHtml: conversation.innerHTML,
+            conversationHtml: DOM[$id.CONVERSATION].innerHTML,
             lastUpdatedTime: Date.now(),
             label: data.label,
             queriesMade: queriesMade,
@@ -415,153 +507,380 @@ async function main() {
     }
   };
 
-  if (
-    !userQuery ||
-    !sendButton ||
-    !loadingIndicator ||
-    !closeButton ||
-    !openSidePanelBtn ||
-    !conversation ||
-    !recentChatsContainer ||
-    !newChatWindowButton ||
-    !addFileButton ||
-    !container ||
-    !settingsButton ||
-    !settingMenuCloseButton ||
-    !themeToggle
-  ) {
-    console.error("One or more elements are missing from the webview.");
-    console.error(` 
-    ${!userQuery ? "userQuery missing" : ""} 
-      ${!sendButton ? "sendButton missing" : ""} 
-      ${!loadingIndicator ? "loadingIndicator missing" : ""} 
-      ${!closeButton ? "closeButton missing" : ""} 
-      ${!openSidePanelBtn ? "openSidePanelBtn missing" : ""} 
-      ${!conversation ? "conversation container missing" : ""} 
-      ${!recentChatsContainer ? "recentChatsContainer missing" : ""} 
-      ${!newChatWindowButton ? "newChatWindowButton missing" : ""} 
-      ${!addFileButton ? "addFileButton missing" : ""}
-      ${!container ? "container missing" : ""}
-      ${!settingsButton ? "settingsButton missing" : ""}
-      ${!settingMenuCloseButton ? "settings close button missing" : ""}
-      ${!themeToggle ? "theme toggle missing" : ""}
-    `);
+  const setTheme = (theme: OllamaWebviewThemes): void => {
+    if (typeof theme !== "string") {
+      theme = "dark";
+    }
+
+    const themes: OllamaWebviewThemes[] = [
+      "light",
+      "dark",
+      "rose-gold",
+      "high-contrast",
+      "pokemon-theme",
+    ];
+
+    const body = document.body;
+    if (body.classList.contains(theme)) {
+      return;
+    } else {
+      themes.forEach((_theme) => {
+        body.classList.remove(_theme);
+      });
+      body.classList.add(theme.toLowerCase());
+    }
+
+    // Update the radio button selection
+    switch (theme) {
+      case "light":
+        (DOM[$id.THEME_TOGGLE_LIGHT] as HTMLInputElement).checked = true;
+        break;
+      case "dark":
+        (DOM[$id.THEME_TOGGLE_DARK] as HTMLInputElement).checked = true;
+        break;
+      case "rose-gold":
+        (DOM[$id.THEME_TOGGLE_ROSE_GOLD] as HTMLInputElement).checked = true;
+        break;
+      case "high-contrast":
+        (DOM[$id.THEME_TOGGLE_HIGH_CONTRAST] as HTMLInputElement).checked =
+          true;
+        break;
+      case "pokemon-theme":
+        (DOM[$id.THEME_TOGGLE_POKEMON_THEME] as HTMLInputElement).checked =
+          true;
+        break;
+      default:
+        (DOM[$id.THEME_TOGGLE_DARK] as HTMLInputElement).checked = true;
+    }
+  };
+
+  const switchToggle = () => {
+    const selectedTheme = (
+      document.querySelector(
+        'input[name="themeToggle"]:checked'
+      ) as HTMLInputElement
+    ).value.toLowerCase() as OllamaWebviewThemes;
+
+    setTheme(selectedTheme);
+
+    // Send the selected theme to the VS Code extension
+
+    vscode.postMessage({
+      command: "saveThemePreference",
+      theme: selectedTheme,
+    });
+  };
+
+  const openSettingsMenu = () => {
+    const settingsMenu = document.querySelector("#settingsMenu") as HTMLElement;
+    if (!settingsMenu) {
+      return;
+    }
+    settingsMenu.style.height = "100%";
+    // DOM[$id.CONVERSATION].style.height = "0";
+    DOM[$id.CONVERSATION].style.visibility = "hidden";
+    DOM[$id.PROMPT_BAR].style.visibility = "hidden";
+    // conversation.style.height = "0";
+    closeSidePanel();
+  };
+
+  const closeSettingsMenu = () => {
+    const settingsMenu = document.querySelector("#settingsMenu") as HTMLElement;
+    if (!settingsMenu) {
+      return;
+    }
+    settingsMenu.style.height = "0";
+    // DOM[$id.CONVERSATION].style.height = "100%";
+    DOM[$id.CONVERSATION].style.visibility = "visible";
+
+    DOM[$id.PROMPT_BAR].style.visibility = "visible";
+    // conversation.style.height = "100%";
+  };
+
+  const openSidePanel = () => {
+    const sidePanel = document.getElementById("sidePanel");
+    const container = document.querySelector(".container");
+    if (!sidePanel || !container) {
+      return;
+    }
+
+    sidePanel.style.width = "175px"; // Set the width of the side panel
+    sidePanel.style.paddingLeft = "20px";
+    container.classList.add("with-panel"); // Move content to the right
+    document.addEventListener("click", handleClickOutsidePanel);
+  };
+
+  const closeSidePanel = () => {
+    const sidePanel = document.getElementById("sidePanel");
+    const container = document.querySelector(".container");
+    if (!sidePanel || !container) {
+      return;
+    }
+
+    sidePanel.style.width = "0"; // Reset the width of the side panel
+    sidePanel.style.paddingLeft = "0";
+    container.classList.remove("with-panel"); // Move content back
+    document.removeEventListener("click", handleClickOutsidePanel);
+  };
+
+  // Function to handle clicks outside the side panel
+  const handleClickOutsidePanel = (event: Event) => {
+    const sidePanel = document.getElementById("sidePanel");
+
+    // Check if the click was outside the side panel and its content
+    if (
+      sidePanel &&
+      !sidePanel.contains(event.target as Node) &&
+      !DOM[$id.OPEN_SIDE_PANEL_BUTTON].contains(event.target as Node)
+    ) {
+      let activeSidePanelMenus = document.querySelectorAll(".active");
+      if (activeSidePanelMenus) {
+        activeSidePanelMenus.forEach((menu) => {
+          menu.classList.remove("active");
+        });
+      }
+
+      // console.log("Closing side panel", event.target);
+      closeSidePanel();
+    }
+  };
+
+  const saveData = (): void => {
+    const saveData = JSON.stringify(conversationsContainer, replacer);
+    // console.log("Saving chat history.");
+    vscode.postMessage({
+      command: "saveChat",
+      data: saveData,
+    });
     return;
+  };
+
+  function debounce(func: (...args: any[]) => void, delay: number) {
+    let debounceTimer: NodeJS.Timeout | undefined;
+
+    return (...args: any[]) => {
+      // Clear the previous timer if it exists
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+
+      // Set a new timer to invoke the function after the specified delay
+      debounceTimer = setTimeout(() => {
+        func(...args); // Call the original function with the provided arguments
+      }, delay);
+    };
   }
+
+  const debounceSystemPrompt = debounce((systemPrompt: string) => {
+    vscode.postMessage({
+      command: "saveUserSystemPrompt",
+      systemPrompt: systemPrompt || "",
+    });
+  }, 3000);
+
+  DOM[$id.SYSTEM_PROMPT].addEventListener("input", (e) => {
+    const systemPrompt = (e.target as HTMLInputElement).value;
+    if (systemPrompt.trim() === "") {
+      console.log("Input cleared");
+      debounceSystemPrompt(systemPrompt); // Call your debounce function
+    } else {
+      debounceSystemPrompt(systemPrompt);
+    }
+  });
+
+  setTheme(await ollamaThemePreference);
+
+  DOM[$id.SYSTEM_PROMPT].innerText = userSystemPrompt;
 
   //Checks to see if conversationsContainer has any values already and uses the users previous chat to display, instead of the new chat screen.
   if (conversationsContainer && conversationsContainer.size) {
-    conversation.style.justifyContent = "flex-start";
+    DOM[$id.CONVERSATION].style.justifyContent = "flex-start";
+    //conversation.style.justifyContent = "flex-start";
     let uuid = 0;
     for (let [key, val] of conversationsContainer.entries()) {
       if (val.lastUpdatedTime > uuid) {
         uuid = val.lastUpdatedTime;
         selectedUUID = key;
       }
-
+      // console.log("Label set to: " + val.label);
       const chatLabel = createChatLabel(key, val.label ? val.label : key);
-      recentChatsContainer.appendChild(chatLabel);
+      DOM[$id.RECENT_CHATS_CONTAINER].appendChild(chatLabel);
     }
 
-    console.log("Setting to previous conversation: " + selectedUUID);
+    // console.log("Setting to previous conversation: " + selectedUUID);
     const selectedConversation = conversationsContainer.get(selectedUUID);
     if (selectedConversation) {
       queriesMade = selectedConversation.queriesMade;
-      conversation.innerHTML = selectedConversation.conversationHtml;
-      //reattaches copy button event listeners.
+      DOM[$id.CONVERSATION].innerHTML = selectedConversation.conversationHtml;
       reattachEventListeners();
     }
   } else {
     selectedUUID = createUUID();
-    console.log("No previous conversations");
+    // console.log("No previous conversations");
   }
 
-  console.log(
-    `\nQueries made: ${queriesMade} | conversation container: ${conversation.innerHTML.trim()}`
-  );
+  /* console.log(
+    `\nQueries made: ${queriesMade} | conversation container: ${DOM[
+      $id.CONVERSATION
+    ].innerHTML.trim()}`
+  ); */
 
   //Sets html to intial conversation view and adds event listeners to the suggested prompts buttons
-  if (queriesMade === 0 && conversation.innerHTML.trim() === "") {
-    conversation.innerHTML = initialConversationView;
+  if (queriesMade === 0 && DOM[$id.CONVERSATION].innerHTML.trim() === "") {
+    DOM[$id.CONVERSATION].innerHTML = initialConversationView;
     addEventListenerToClass(".promptSuggestions", "click", (e: MouseEvent) => {
-      promptAI((e.target as HTMLDivElement).innerHTML);
+      const elem = e.target as HTMLDivElement;
+      if (elem.hasAttribute("data-options")) {
+        promptAI((e.target as HTMLDivElement).innerHTML, optionsString);
+      } else {
+        promptAI((e.target as HTMLDivElement).innerHTML);
+      }
     });
   }
 
-  newChatWindowButton.addEventListener("click", handleCreateConversation);
+  // newChatWindowButton.addEventListener("click", handleCreateConversation);
+  DOM[$id.NEW_CHAT_WINDOW_BUTTON].addEventListener(
+    "click",
+    handleCreateConversation
+  );
 
-  addFileButton.addEventListener("click", async () => {
+  DOM[$id.ADD_FILE_BUTTON].addEventListener("click", async () => {
     vscode.postMessage({
       command: "openFileDialog",
+      embeddedDoc: false,
     });
   });
 
-  settingsButton.addEventListener("click", openSettingsMenu);
-
-  settingMenuCloseButton.addEventListener("click", closeSettingsMenu);
-
-  closeButton.addEventListener("click", closeSidePanel);
-
-  openSidePanelBtn.addEventListener("click", openSidePanel);
-
-  themeToggle.addEventListener("click", () => {
-    const body = document.body;
-    if (body.classList.contains("dark")) {
-      body.classList.remove("dark");
-      body.classList.add("light");
-      themeToggle.innerText = "Light";
-    } else {
-      body.classList.remove("light");
-      body.classList.add("dark");
-      themeToggle.innerText = "Dark";
-    }
+  DOM[$id.EMBED_FILE_BUTTON].addEventListener("click", async () => {
+    vscode.postMessage({
+      command: "openFileDialog",
+      embeddedDoc: true,
+    });
   });
 
-  userQuery.addEventListener("input", (e) => {
+  DOM[$id.SAVE_EMBEDDED_DOCS_BUTTON].addEventListener("click", async () => {
+    if (!documentsToEmbed.length) {
+      return;
+    }
+    vscode.postMessage({
+      command: "embedFiles",
+      files: documentsToEmbed,
+    });
+  });
+
+  DOM[$id.SETTINGS_BUTTON].addEventListener("click", openSettingsMenu);
+
+  DOM[$id.SETTINGS_MENU_CLOSE_BUTTON].addEventListener(
+    "click",
+    closeSettingsMenu
+  );
+
+  DOM[$id.SIDEBAR_CLOSE_BUTTON].addEventListener("click", closeSidePanel);
+
+  DOM[$id.OPEN_SIDE_PANEL_BUTTON].addEventListener("click", openSidePanel);
+
+  DOM[$id.THEME_TOGGLE_DARK].addEventListener("click", switchToggle);
+  DOM[$id.THEME_TOGGLE_LIGHT].addEventListener("click", switchToggle);
+  DOM[$id.THEME_TOGGLE_ROSE_GOLD].addEventListener("click", switchToggle);
+  DOM[$id.THEME_TOGGLE_HIGH_CONTRAST].addEventListener("click", switchToggle);
+  DOM[$id.THEME_TOGGLE_POKEMON_THEME].addEventListener("click", switchToggle);
+  // Helper function to calculate the rendered width of the text
+  function getTextWidth(text: string, font: string) {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) {
+      return;
+    }
+    context.font = font; // Use the same font as the textarea
+    const metrics = context.measureText(text);
+    return metrics.width;
+  }
+
+  DOM[$id.SEARCH_BAR].addEventListener("input", (e) => {
     if (!e.target) {
       return;
     }
-    let elem = e.target as HTMLInputElement;
-    if (elem.value.length > 0) {
+    let searchBar = e.target as HTMLInputElement;
+    if (searchBar.value.length > 0 && searchBar.value.trim() !== "") {
       activateSendButton();
-      const txt = elem.value.replace(/\r\n/g, "\n");
-      const lines = txt.split("\n").length;
-      console.log("\nLines: " + lines);
+
+      const textLength = getTextWidth(
+        searchBar.value,
+        getComputedStyle(searchBar).font
+      );
+
+      const searchBarWidth = searchBar.clientWidth;
+
       if (
-        (lines >= 2 && lines < 4) ||
-        (elem.value.length >= 70 && elem.value.length <= 140)
+        isOverflown(searchBar) &&
+        textLength &&
+        textLength > 0.8 * searchBarWidth
       ) {
-        userQuery.style.height = "100px";
-      } else if (lines >= 4 || elem.value.length > 140) {
-        userQuery.style.height = "200px";
+        const currentHeight = parseInt(getComputedStyle(searchBar).height, 10);
+        // Increase height by 28px while respecting max-height in CSS
+        searchBar.style.height =
+          Math.min(currentHeight + 28, window.innerHeight * 0.25) + "px";
+      }
+
+      if (
+        parseInt(getComputedStyle(searchBar).height, 10) >
+        window.innerHeight * 0.24
+      ) {
+        searchBar.style.overflowY = "scroll";
       } else {
-        userQuery.style.height = "auto";
+        searchBar.style.overflowY = "";
       }
     } else {
       deactivateSendButton();
-      userQuery.style.height = "auto";
+      DOM[$id.SEARCH_BAR].style.height = "";
+      DOM[$id.SEARCH_BAR].style.boxShadow = "";
     }
   });
 
-  userQuery.addEventListener("keypress", function (e) {
+  DOM[$id.SEARCH_BAR].addEventListener("keypress", function (e) {
     if (e.key === "Enter" && !e.shiftKey) {
-      if (userQuery.value.trim() !== "" || documentsAppendedToQuery.length) {
-        promptAI(userQuery.value);
+      if (
+        (DOM[$id.SEARCH_BAR] as HTMLFormElement).value.trim() !== "" ||
+        documentsAppendedToQuery.length
+      ) {
+        const originalQuery = (DOM[$id.SEARCH_BAR] as HTMLInputElement).value;
+        let query = originalQuery;
+        query = query.toLowerCase().trim().replace(".", "");
+        //FIXME - Add details for setting up model AI assistant if no response detected.
+        if (
+          query === "option" ||
+          query === "options" ||
+          query === "setting" ||
+          query === "settings" ||
+          query === "help" ||
+          query === "info"
+        ) {
+          promptAI(query, optionsString);
+        } else if (
+          query === "connect to chatgpt" ||
+          query === "use chatgpt" ||
+          query === "chatgpt" ||
+          query === "openai"
+        ) {
+          promptAI(query, options_connectingToOpenAI);
+        } else {
+          promptAI(originalQuery);
+        }
       }
     }
   });
 
-  sendButton.addEventListener("click", () => {
-    if (userQuery.value.trim() !== "" || documentsAppendedToQuery.length) {
-      promptAI(userQuery.value);
+  DOM[$id.SEND_BUTTON].addEventListener("click", () => {
+    if (
+      (DOM[$id.SEARCH_BAR] as HTMLInputElement).value.trim() !== "" ||
+      documentsAppendedToQuery.length
+    ) {
+      promptAI((DOM[$id.SEARCH_BAR] as HTMLInputElement).value);
     }
   });
 
   function updateAppendedDocumentsUI() {
-    if (!documentsContainer) {
-      return;
-    }
-    documentsContainer.innerHTML = ""; // Clear the existing list
+    DOM[$id.APPENDED_DOCUMENTS_CONTAINER].innerHTML = ""; // Clear the existing list
 
     documentsAppendedToQuery.forEach((doc, index) => {
       const docElement = document.createElement("div");
@@ -577,7 +896,7 @@ async function main() {
         documentsAppendedToQuery.splice(index, 1); // Remove the document from the array
         updateAppendedDocumentsUI(); // Refresh the UI
         if (
-          userQuery.value.length === 0 &&
+          (DOM[$id.SEARCH_BAR] as HTMLInputElement).value.length === 0 &&
           documentsAppendedToQuery.length === 0
         ) {
           deactivateSendButton();
@@ -586,33 +905,59 @@ async function main() {
 
       docElement.appendChild(docName);
       docElement.appendChild(removeIcon);
-      documentsContainer.appendChild(docElement);
+
+      DOM[$id.APPENDED_DOCUMENTS_CONTAINER].appendChild(docElement);
     });
     activateSendButton();
   }
 
+  function updateEmbeddedDocumentsUI() {
+    DOM[$id.DIV_DOCS_TO_EMBED_CONTAINER].innerHTML = ""; // Clear the existing list
+
+    documentsToEmbed.forEach((doc, index) => {
+      const docElement = document.createElement("div");
+      docElement.className = "appended-document";
+
+      const docName = document.createElement("span");
+      docName.innerText = doc.fileName;
+
+      const removeIcon = document.createElement("span");
+      removeIcon.className = "remove-icon";
+      removeIcon.innerHTML = closeSvgIcon;
+      removeIcon.onclick = () => {
+        documentsToEmbed.splice(index, 1); // Remove the document from the array
+        updateEmbeddedDocumentsUI(); // Refresh the UI
+      };
+
+      docElement.appendChild(docName);
+      docElement.appendChild(removeIcon);
+
+      DOM[$id.DIV_DOCS_TO_EMBED_CONTAINER].appendChild(docElement);
+    });
+  }
+
   function clearDocumentsContainer() {
-    if (!documentsContainer) {
-      return;
-    }
-    documentsContainer.innerHTML = "";
+    DOM[$id.APPENDED_DOCUMENTS_CONTAINER].innerHTML = "";
+
     documentsAppendedToQuery = [];
   }
 
-  function promptAI(message: string) {
-    if (!userQuery || !loadingIndicator || !sendButton || !conversation) {
-      return;
-    }
+  function promptAI(message: string, contextMessage?: string) {
     deactivateSendButton();
+    closeSettingsMenu();
 
     if (queriesMade === 0) {
-      conversation.innerHTML = "";
-      conversation.style.justifyContent = "flex-start";
+      DOM[$id.CONVERSATION].innerHTML = "";
+      DOM[$id.CONVERSATION].style.justifyContent = "flex-start";
     }
 
     queriesMade++;
-    //userQuery.value;
+
     let query = message;
+    if (contextMessage) {
+      query += " " + contextMessage;
+    }
+
     let visibleMessage = message;
     if (documentsAppendedToQuery.length) {
       if (query.trim() === "") {
@@ -645,8 +990,8 @@ async function main() {
     }
 
     displayMessage(visibleMessage, "user");
-    console.log("Container ", conversationsContainer);
-    console.log(typeof conversationsContainer);
+    // console.log("Container ", conversationsContainer);
+    // console.log(typeof conversationsContainer);
     if (conversationsContainer && !conversationsContainer.has(selectedUUID)) {
       vscode.postMessage({
         command: "getLabelName",
@@ -660,30 +1005,25 @@ async function main() {
       query: query,
     });
 
-    loadingIndicator.style.display = "inline";
+    DOM[$id.LOADING_INDICATOR].style.display = "inline";
 
-    userQuery.value = "";
-    userQuery.style.height = "auto";
+    resetUserQuery();
     clearDocumentsContainer();
   }
 
   async function displayMessage(message: string, sender: string) {
-    if (!conversation) {
-      return;
-    }
     const ollamaImg = await ollamaImgPromise;
 
     const messageElement = document.createElement("div");
     messageElement.className =
-      sender === "user" ? "user-message" : "ai-message";
+      sender === "user" ? "user-message" : "ai-message clearBackground";
 
-    // messageElement.innerText = message;
-    if (messageElement.className === "ai-message") {
+    if (messageElement.className === "ai-message clearBackground") {
       messageElement.insertAdjacentHTML(
         "afterbegin",
         `<div class="flex-nowrap pt-4">
           <img src="${ollamaImg}" alt="Ollama" class="ollama-message-icon"/>
-          <div>${message}</div>
+          <div class="ai-message">${message}</div>
          </div>
         `
       );
@@ -718,116 +1058,107 @@ async function main() {
     clipboardIconContainer.appendChild(clipboardIcon);
     messageOptions.appendChild(clipboardIconContainer);
     messageElement.appendChild(messageOptions);
+    DOM[$id.CONVERSATION].appendChild(messageElement);
+    DOM[$id.CONVERSATION].scrollTop = DOM[$id.CONVERSATION].scrollHeight;
 
-    conversation.appendChild(messageElement);
-    conversation.scrollTop = conversation.scrollHeight; // Scroll to the bottom
     updateConversationContainer();
   }
 
-  async function parseAndDisplayResponse(aiResponse: string) {
-    if (!loadingIndicator || !conversation) {
-      return;
-    }
-
+  function parseAIResponse(aiResponse: string) {
     if (typeof aiResponse !== "string") {
       vscode.postMessage({
         command: "logError",
         text: `Invalid response message: \nReceived:${typeof aiResponse} | Expected a string.`,
       });
-
       return;
     }
-
-    // Regular expression to match back ticks
-
-    const codeRegex = /([\s\S]*?)```([\s\S]*?)```([\s\S]*)/;
-
-    const matches = aiResponse.match(codeRegex);
-    // console.log(JSON.stringify(matches));
 
     const aiMessage = document.createElement("div");
     aiMessage.className = "ai-message";
 
-    if (matches && matches.length > 0) {
-      const textBeforeCode = matches[1] ? matches[1].trim() : ""; // Ensure it's not undefined
-      const code = matches[2] ? matches[2].trim() : ""; // Ensure it's not undefined
-      const remainingText = matches[3] ? matches[3].trim() : ""; // Ensure it's not undefined
+    // Split the response by code blocks
+    const parts = aiResponse.split(/```(?:[\w-]+)?\n?/);
 
-      // Create and append the div for text before the code
-      if (textBeforeCode.trim()) {
-        const preCodeContainer = document.createElement("div");
-        preCodeContainer.className = "pre-code-container";
-        const ollamaImg = await ollamaImgPromise;
-        preCodeContainer.insertAdjacentHTML(
-          "afterbegin",
-          `<div class="flex-nowrap pt-4 itemsCenter">
-            <img src="${ollamaImg}" alt="Ollama" class="ollama-message-icon"/>
-            <div>${textBeforeCode.trim()}</div>
-           </div>
-        `
-        );
-        // preCodeContainer.innerText = textBeforeCode.trim();
-        aiMessage.appendChild(preCodeContainer);
-      }
+    if (parts.length > 1) {
+      parts.forEach((part, index) => {
+        if (index % 2 === 0) {
+          // Text content
+          if (part.trim()) {
+            const textContainer = document.createElement("div");
+            textContainer.className = "text-container";
+            const highlightedText = part.replace(
+              /`([^`]+)`/g,
+              '<span class="highlightText">$1</span>'
+            );
+            textContainer.innerHTML = highlightedText.trim();
+            // textContainer.innerText = part.trim();
+            aiMessage.appendChild(textContainer);
+          }
+        } else {
+          // Code content
+          const codeContainer = document.createElement("div");
+          codeContainer.className = "code-container";
 
-      // Create and append the div for the code block
-      const codeContainer = document.createElement("div");
-      codeContainer.className = "code-container";
+          const clipboardIcon = document.createElement("span");
+          clipboardIcon.className = "clipboard-icon";
+          clipboardIcon.innerHTML = copySvgIcon;
+          clipboardIcon.onclick = () => copyToClipboard(part.trim());
 
-      const clipboardIcon = document.createElement("span");
-      clipboardIcon.className = "clipboard-icon";
-      clipboardIcon.innerHTML = copySvgIcon;
-      clipboardIcon.onclick = () => copyToClipboard(code);
+          const codeBlock = document.createElement("pre");
+          codeBlock.innerText = `\n${part.trim()}`;
 
-      const codeBlock = document.createElement("pre");
-      codeBlock.innerText = `\n${code}`;
+          codeContainer.appendChild(clipboardIcon);
+          codeContainer.appendChild(codeBlock);
+          aiMessage.appendChild(codeContainer);
+        }
+      });
 
-      codeContainer.appendChild(clipboardIcon);
-      codeContainer.appendChild(codeBlock);
-      aiMessage.appendChild(codeContainer);
-
-      // Create and append the div for remaining text
-      if (remainingText.trim()) {
-        const postCodeContainer = document.createElement("div");
-        postCodeContainer.className = "post-code-container";
-        postCodeContainer.innerText = remainingText.trim();
-        aiMessage.appendChild(postCodeContainer);
-      }
-
-      const clipboardIconContainer = document.createElement("div");
-      clipboardIconContainer.className = "clipboard-icon-container tooltip";
-      clipboardIconContainer.onclick = () => {
-        copyToClipboard(
-          aiMessage.innerText.replaceAll(copySvgIcon, "").replace("Copy", "")
-        );
-      };
-
-      const toolTipCopyMessage = document.createElement("span");
-      toolTipCopyMessage.className = "tooltiptext";
-      toolTipCopyMessage.innerHTML = "Copy";
-      clipboardIconContainer.appendChild(toolTipCopyMessage);
-
-      const clipboardIcon_ = document.createElement("span");
-      clipboardIcon_.className = "clipboard-icon-messages";
-      clipboardIcon_.innerHTML = copySvgIcon;
-
-      clipboardIconContainer.appendChild(clipboardIcon_);
-
-      const messageOptions = document.createElement("div");
-      messageOptions.className = "message-options";
-      messageOptions.appendChild(clipboardIconContainer);
-
+      // Add message options (copy entire message functionality)
+      const messageOptions = createMessageOptions(aiMessage);
       aiMessage.appendChild(messageOptions);
-      conversation.appendChild(aiMessage);
-      conversation.scrollTop = conversation.scrollHeight; // Scroll to the bottom
+
+      DOM[$id.CONVERSATION].appendChild(aiMessage);
+      DOM[$id.CONVERSATION].scrollTop = DOM[$id.CONVERSATION].scrollHeight;
+
       updateConversationContainer();
     } else {
       // If no code block, display the entire response as regular text
-      displayMessage(aiResponse, "ai");
+      const highlightedText = aiResponse.replace(
+        /`([^`]+)`/g,
+        '<span class="highlightText">$1</span>'
+      );
+      displayMessage(highlightedText, "ai");
     }
 
     // Hide loading indicator
-    loadingIndicator.style.display = "none";
+    DOM[$id.LOADING_INDICATOR].style.display = "none";
+  }
+
+  function createMessageOptions(aiMessage: HTMLDivElement) {
+    const clipboardIconContainer = document.createElement("div");
+    clipboardIconContainer.className = "clipboard-icon-container tooltip";
+    clipboardIconContainer.onclick = () => {
+      copyToClipboard(
+        aiMessage.innerText.replaceAll(copySvgIcon, "").replace("Copy", "")
+      );
+    };
+
+    const toolTipCopyMessage = document.createElement("span");
+    toolTipCopyMessage.className = "tooltiptext";
+    toolTipCopyMessage.innerHTML = "Copy";
+    clipboardIconContainer.appendChild(toolTipCopyMessage);
+
+    const clipboardIcon = document.createElement("span");
+    clipboardIcon.className = "clipboard-icon-messages";
+    clipboardIcon.innerHTML = copySvgIcon;
+
+    clipboardIconContainer.appendChild(clipboardIcon);
+
+    const messageOptions = document.createElement("div");
+    messageOptions.className = "message-options";
+    messageOptions.appendChild(clipboardIconContainer);
+
+    return messageOptions;
   }
 
   function copyToClipboard(text: string) {
@@ -859,17 +1190,30 @@ async function main() {
       // console.log(JSON.stringify(message));
       switch (message.command) {
         case "displayResponse":
-          parseAndDisplayResponse(message.response);
+          // parseAndDisplayResponse(message.response);
+          parseAIResponse(message.response);
           break;
         case "fileSelected":
           const fileName = message.fileName;
           const fileContent = message.content;
+          const filePath = message.fullFileName;
+          if (message.embeddedDoc) {
+            documentsToEmbed.push({
+              fileName: fileName,
+              fileContent: fileContent,
+              filePath: filePath,
+            });
 
-          documentsAppendedToQuery.push({
-            fileName: fileName,
-            fileContent: fileContent,
-          });
-          updateAppendedDocumentsUI();
+            updateEmbeddedDocumentsUI();
+          } else {
+            documentsAppendedToQuery.push({
+              fileName: fileName,
+              fileContent: fileContent,
+              filePath: filePath,
+            });
+
+            updateAppendedDocumentsUI();
+          }
           break;
         case "updateChatHistory":
           if (!conversationsContainer || !conversationsContainer.size) {
@@ -879,7 +1223,7 @@ async function main() {
             );
             return;
           }
-          console.log("update chat history:", selectedUUID);
+          // console.log("update chat history:", selectedUUID);
           if (conversationsContainer.has(selectedUUID)) {
             let data = conversationsContainer.get(selectedUUID);
             if (data) {
@@ -889,16 +1233,11 @@ async function main() {
             }
           }
 
-          console.log(
+          /* console.log(
             "Conversation container pre save: ",
             conversationsContainer
-          );
-          let saveData = JSON.stringify(conversationsContainer, replacer);
-          console.log("Saving chat history: " + saveData);
-          vscode.postMessage({
-            command: "saveChat",
-            data: saveData,
-          });
+          ); */
+          saveData();
           break;
         case "logError":
           vscode.postMessage({
@@ -919,9 +1258,9 @@ async function main() {
                   label: message.label,
                 });
               }
-              if (recentChatsContainer) {
+              if (DOM[$id.RECENT_CHATS_CONTAINER]) {
                 // Iterate over each child of recentChatsContainer
-                const children = recentChatsContainer.children;
+                const children = DOM[$id.RECENT_CHATS_CONTAINER].children;
                 for (let i = 0; i < children.length; i++) {
                   const child = children[i] as HTMLElement;
 
@@ -947,7 +1286,7 @@ async function main() {
           break;
         case "eraseAllChats":
           handleCreateConversation();
-          recentChatsContainer.innerHTML = "";
+          DOM[$id.RECENT_CHATS_CONTAINER].innerHTML = "";
           break;
         default:
           console.error("Unknown command:", message.command);
@@ -961,63 +1300,5 @@ async function main() {
   };
 
   windowListener();
-
-  function openSettingsMenu() {
-    const settingsMenu = document.querySelector("#settingsMenu") as HTMLElement;
-    if (!settingsMenu || !conversation) {
-      return;
-    }
-    settingsMenu.style.height = "100%";
-    conversation.style.height = "0";
-  }
-
-  function closeSettingsMenu() {
-    const settingsMenu = document.querySelector("#settingsMenu") as HTMLElement;
-    if (!settingsMenu || !conversation) {
-      return;
-    }
-    settingsMenu.style.height = "0";
-    conversation.style.height = "100%";
-  }
-
-  function openSidePanel() {
-    const sidePanel = document.getElementById("sidePanel");
-    const container = document.querySelector(".container");
-    if (!sidePanel || !container) {
-      return;
-    }
-
-    sidePanel.style.width = "175px"; // Set the width of the side panel
-    sidePanel.style.paddingLeft = "20px";
-    container.classList.add("with-panel"); // Move content to the right
-    document.addEventListener("click", handleClickOutsidePanel);
-  }
-
-  function closeSidePanel() {
-    const sidePanel = document.getElementById("sidePanel");
-    const container = document.querySelector(".container");
-    if (!sidePanel || !container) {
-      return;
-    }
-    sidePanel.style.width = "0"; // Reset the width of the side panel
-    sidePanel.style.paddingLeft = "0";
-    container.classList.remove("with-panel"); // Move content back
-    document.removeEventListener("click", handleClickOutsidePanel);
-  }
-
-  // Function to handle clicks outside the side panel
-  function handleClickOutsidePanel(event: Event) {
-    const sidePanel = document.getElementById("sidePanel");
-    openSidePanelBtn;
-    console.log(event.target);
-    // Check if the click was outside the side panel and its content
-    if (
-      sidePanel &&
-      !sidePanel.contains(event.target as Node) &&
-      !openSidePanelBtn.contains(event.target as Node)
-    ) {
-      closeSidePanel();
-    }
-  }
 }
 main();

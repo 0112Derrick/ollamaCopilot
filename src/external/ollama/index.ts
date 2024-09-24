@@ -5,11 +5,28 @@ import { MessageRoles } from "../../providers/webViewProvider";
 
 export const llama3 = {
   maxToken: 4096,
-  name: "llama3",
+  name: "llama3.1",
+};
+
+export const openAIModel = {
+  maxToken: 4096,
+  name: "gpt-4o-mini",
+};
+
+export const openAiEmbedModel = {
+  name: "text-embedding-3-large",
 };
 
 export const defaultURLChatCompletion = "http://localhost:11434/api/generate";
 export const defaultURLChat = "http://localhost:11434/api/chat";
+export const defaultEmbedURL = "http://localhost:11434/api/embed";
+
+export const openAIChatCompletion =
+  "https://api.openai.com/v1/chat/completions";
+export const openAIEmbedUrl = "https://api.openai.com/v1/embeddings";
+export const openAIGenerateImage =
+  "https://api.openai.com/v1/images/generations";
+export const openAITextModeration = "https://api.openai.com/v1/moderations";
 
 export async function generateCompletion(
   query: string,
@@ -53,6 +70,7 @@ type choices = {
   index: number;
   logprobs: any;
 }[];
+
 //Chat with an AI model
 export async function generateChatCompletion(
   model: string = llama3.name,
@@ -94,7 +112,11 @@ export async function generateChatCompletion(
     //   )}`
     // );
     const response = await axios.post(url, data_, config);
-
+    console.log(
+      `Data sent to ollama: URL: ${url} \nData: ${JSON.stringify(
+        data_
+      )} \nConfig: ${JSON.stringify(config)}`
+    );
     if (typeof response.data === "string" && isValidJson(response.data)) {
       return JSON.parse(response.data);
     } else {

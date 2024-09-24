@@ -22,34 +22,43 @@ Github: [Ollama Github](https://github.com/ollama/ollama)
 
 ## Recommend Hardware
 
-Minimum required RAM: 8GB is a minimum, more is better since even smallest model takes 5GB of RAM. The best way: dedicated machine with RTX 4090. Install [Ollama](https://ollama.com) on this machine and configure endpoint in extension settings to offload to this machine. Second best way: run on MacBook M1/M2/M3 with enough RAM (more == better, but 10gb extra would be enough). For windows notebooks: it runs good with decent GPU, but dedicated machine with a good GPU is recommended. Perfect if you have a dedicated gaming PC.
+Minimum required RAM: 10GB is a minimum, more is better since even the smallest model takes 5GB of RAM. The best way: dedicated machine with RTX 4090. Install [Ollama](https://ollama.com) on this machine and configure endpoint in extension settings to offload to this machine. Second best way: run on MacBook M1/M2/M3 with enough RAM (more == better, but 10gb+ would be enough). For windows notebooks: it runs well with a decent GPU, but dedicated machine with a good GPU is recommended. Perfect if you have a dedicated gaming PC. If your hardware has less than 10gb ram then we recommend you connect the app to OpenAI. OpenAI URL: `https://api.openai.com/v1/chat/completions`, model: `gpt-4o-mini`, you will need to set your headers to `Authorization:Bearer *$OPENAI_API_KEY*`.
 
 ## Features
 
 Ollama webview
-![media](media/features/ollamaWebview.png)
+
+<!-- ![media](media/features/ollamaWebview.png) -->
 
 Directly interact with whatever model you are running by using the webview from the chat extension.
 
-You can also query the model inline:
-![media](media/features/inlinePrompt.png)
+Extension supports inline suggestions from models:
 
-Once a response is received it will store it in your suggestions which you can see by typing '/'
-![media](media/features/inlineResponse.png)
+<!-- ![media](media/features/inlinePrompt.png) -->
 
-The app will scan your current document every 25 secs checking for boiler plate code in order to speed up the development process.
+- The app will scan your current document routinely helping to auto complete code.
+- If you have an embed model set and an embed url the app will scan your current document and after 50 newlines of code is added to the current document it will re-embed that document.
+- You can drag and drop in new documents and they will be embedded as a part of your current workspace.
+- In the webview you can change the apps theme, add documents to embed, and set a custom system prompt.
 
 `Commands:`
+`Ctrl+Shift+P | CMD+Shift+P:`
+`Set Ollama Headers`
+`Set Ollama Model`
+`Set Ollama Url`
+`Reset Ollama Url | Model | Headers`
+`Ollama: uninstall`
+`Ollama workspace: Clear all saved embedded data for the current workspace.`
 
-- / - will open the suggestions menu if you have any suggestions.
+`Right Click Commands (Highlight code):`
+`Offer a suggestion on how to improve this code.`
+`Refactor this code.`
+`Tell me about this code.`
+`Write a unit test for this code.`
+`Debug this code.`
+`Embed this code.`
 
-- //ai {prompt} - Will send an inline query to the model.
-
-- //ai clear - Will empty your ai suggestions box. It keeps a backup.
-
-- //ai restore - Will restore your ai suggestions if you have any.
-
-> Tip: Smaller models may not understand the instructions needed to have the extension work properly. Recommended model is llama3 or higher.
+> Tip: Smaller models may not understand the instructions needed to have the extension work properly. Recommended model is llama3.1 or higher.
 
 ## Requirements
 
@@ -57,30 +66,35 @@ A working server that will listen to post commands at the set url. This server s
 
 By default the app will listen to `http://localhost:11434/api/generate` because this is the default port of Ollama.
 
-By default the app will use `llama3` for the model name in the request.
+By default the app will use `llama3.1` for the model name in the request.
 
 ## Extension Settings
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
+`contributes.configuration`.
 
 This extension contributes the following settings:
 
 - `Set Ollama URL`: Sets where the api request will go to. This is useful if you want to host the model on a separate machine or use a server in the middle of your requests. By default set to `http://localhost:11434/api/generate`
-- `Set Ollama Model`: Sets the model name included in the request. By default set to: `llama3`
+- `Set Ollama Model`: Sets the model name included in the request. By default set to: `llama3.1`
+- `Set Ollama Headers`: Sets the api headers sent in the post request during queries.
+
+> If you switch your embedding model it is recommended to also re-embed your workspace for the best results.
 
 ## Known Issues
 
-- No ability to cancel requests.
-- No ability to turn off model.
-- Does not prompt users what model or url their model is running on in the event of an error.
-- Cannot set ai trigger for the inline prompts.
-- No ability to take in images.
+- Right clicking and prompting ollama does not always open the web view and execute the prompt on the first attempt.
+- Suggestion does not clear out after accepting it.
+- Graphical issue with the webview prompt bar.
+
+## Uninstalling
+
+- Press Cmd + shift + p or Ctrl + shift + p type Ollama: uninstall. This will wipe all saved data by the extension. It is important to do this step before uninstalling the extension because the extension saves your embedded workspaces and vscode will not remove this data if you uninstall the app normally.
 
 ## Troubleshooting
 
-If you are getting an error it most likely means your model is not running or your extension settings are not pointed to your correct model / url.
+- If you are getting an error it most likely means your model is not running or your extension settings are not pointed to your correct model / url.
+
+- Most issues should have an error message pop up and detail the problem.
 
 ## Changelog
 
@@ -90,7 +104,6 @@ Initial release of Ollama copilot
 
 ## Contributing
 
-data = response.message.content;
 Ollama_copilot is open-source under the MIT license. See the [LICENSE](./LICENSE) for more details.
 
 **Enjoy!**

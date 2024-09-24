@@ -27,6 +27,18 @@
         "title": "Set Ollama Model"
       },
       {
+        "command": "ollama-copilot.resetStoredValues",
+        "title": "Reset Ollama: Model | URL | Headers."
+      },
+      {
+        "command": "ollama-copilot.clearAllSavedState",
+        "title": "Ollama: Uninstall"
+      },
+      {
+        "command": "ollama-copilot.clearEmbedData",
+        "title": "Ollama Workspace: Clear all saved embedded data."
+      },
+      {
         "command": "ollama-copilot.setOllamaHeaders",
         "title": "Set Ollama Headers"
       },
@@ -40,21 +52,57 @@
       },
       {
         "command": "ollama-copilot.improveTheCode",
-        "title": "Offer suggestion on how to improve this code."
+        "title": "Improve this code."
       },
       {
         "command": "ollama-copilot.refactorCode",
         "title": "Refactor this code."
       },
       {
+        "command": "ollama-copilot.designPattern",
+        "title": "What is the best design pattern for this code."
+      },
+      {
+        "command": "ollama-copilot.debugTheCode",
+        "title": "Debug this code."
+      },
+      {
         "command": "ollama-copilot.clearWebviewChats",
         "title": "Clear Webview chats."
+      },
+      {
+        "command": "ollama-copilot.writeAUnitTest",
+        "title": "Write a unit test for this function."
+      },
+      {
+        "command": "ollama-copilot.embedCode",
+        "title": "Embed this code."
       }
     ],
     "menus": {
       "editor/context": [
         {
           "command": "ollama-copilot.getMoreInfo",
+          "when": "editorTextFocus",
+          "group": "3_execution"
+        },
+        {
+          "command": "ollama-copilot.embedCode",
+          "when": "editorTextFocus",
+          "group": "3_execution"
+        },
+        {
+          "command": "ollama-copilot.writeAUnitTest",
+          "when": "editorTextFocus",
+          "group": "3_execution"
+        },
+        {
+          "command": "ollama-copilot.designPattern",
+          "when": "editorTextFocus",
+          "group": "3_execution"
+        },
+        {
+          "command": "ollama-copilot.debugTheCode",
           "when": "editorTextFocus",
           "group": "3_execution"
         },
@@ -89,7 +137,7 @@
         {
           "type": "webview",
           "id": "ollamaView",
-          "name": "Ask ai chat"
+          "name": "Ollama webview"
         }
       ]
     }
@@ -110,6 +158,7 @@
     "test": "vscode-test"
   },
   "devDependencies": {
+    "@types/fs-extra": "^9.0.13",
     "@types/mocha": "^10.0.7",
     "@types/node": "20.x",
     "@types/vscode": "^1.92.0",
@@ -119,10 +168,17 @@
     "@vscode/test-electron": "^2.4.0",
     "esbuild": "^0.21.5",
     "eslint": "^8.57.0",
+    "fs-extra": "^10.0.0",
     "npm-run-all": "^4.1.5",
-    "typescript": "^5.4.5"
+    "typescript": "^5.6.0"
   },
   "dependencies": {
-    "axios": "^1.7.4"
-  }
+    "axios": "^1.7.4",
+    "path": "^0.12.7",
+    "vectra": "^0.9.0",
+    "xml2js": "^0.6.2"
+  },
+  "files": [
+    "dist/**/*"
+  ]
 }
