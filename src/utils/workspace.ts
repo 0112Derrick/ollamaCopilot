@@ -1,6 +1,11 @@
 import vscode from "vscode";
 import fs from "fs"; // Add fs module for directory check
 import path from "path";
+import * as xml2js from "xml2js";
+import {
+  testingPackages,
+  supportedLanguagesExtensions,
+} from "../constants/directories";
 
 export const getWorkSpaceId = () => {
   const workspaceId = vscode.workspace.workspaceFile
@@ -40,40 +45,21 @@ async function analyzeFolder(folderPath: string) {
   for (const file of files) {
     const fullPath = path.join(folderPath, file);
     const stats = fs.statSync(fullPath);
+    const isDirectory = stats.isDirectory();
 
-    if (stats.isDirectory()) {
+    if (isDirectory) {
       await analyzeFolder(fullPath); // Recursively analyze folders
-    } else if (
-      fullPath.endsWith(".ts") ||
-      fullPath.endsWith(".js") ||
-      fullPath.endsWith(".py") ||
-      fullPath.endsWith(".java") ||
-      fullPath.endsWith(".c") ||
-      fullPath.endsWith(".cpp") ||
-      fullPath.endsWith(".cs") ||
-      fullPath.endsWith(".go") ||
-      fullPath.endsWith(".rb") ||
-      fullPath.endsWith(".php") ||
-      fullPath.endsWith(".swift") ||
-      fullPath.endsWith(".kt") ||
-      fullPath.endsWith(".rs") ||
-      fullPath.endsWith(".html") ||
-      fullPath.endsWith(".hbs") ||
-      fullPath.endsWith(".handlebars") ||
-      fullPath.endsWith(".css") ||
-      fullPath.endsWith(".scss") ||
-      fullPath.endsWith(".sass") ||
-      fullPath.endsWith(".less") ||
-      fullPath.endsWith(".styl") ||
-      fullPath.endsWith(".vue") ||
-      fullPath.endsWith(".jsx") ||
-      fullPath.endsWith(".tsx")
-    ) {
-      // Read file content and count lines
-      const fileContent = fs.readFileSync(fullPath, "utf8");
-      const lineCount = fileContent.split("\n").length;
-      // Store the document's line count in the map
-      documents.push({ documentName: fullPath, lineCount: lineCount });
+    }
+
+    for (let extension of supportedLanguagesExtensions) {
+      if (!isDirectory && fullPath.endsWith(extension)) {
+        // Read file content and count lines
+        const fileContent = fs.readFileSync(fullPath, "utf8");
+        const lineCount = fileContent.split("\n").length;
+        // Store the document's line count in the map
+        documents.push({ documentName: fullPath, lineCount: lineCount });
+        break;
+      }
     }
   }
 }
@@ -98,6 +84,9 @@ type GradleData = { dependencies: string[]; type: "build.gradle" };
 type rustData = { dependencies: string[]; type: "cargo.toml" };
 type pythonData = { dependencies: string[]; type: "requirements.txt" };
 type javaPomData = { dependencies: string[]; type: "pom.xml" };
+type CsprojData = { dependencies: string[]; type: "csproj" };
+
+type singleDependencyArr = { dependencies: string[] };
 
 type ManifestData =
   | PackageJSONData
@@ -105,7 +94,8 @@ type ManifestData =
   | phpData
   | pythonData
   | rustData
-  | javaPomData;
+  | javaPomData
+  | CsprojData;
 
 type ManifestType =
   | "package.json"
@@ -113,7 +103,8 @@ type ManifestType =
   | "pom.xml"
   | "composer.json"
   | "cargo.toml"
-  | "requirements.txt";
+  | "requirements.txt"
+  | "csproj";
 
 function getProjectManifest(workspaceFolder: vscode.WorkspaceFolder): {
   type: ManifestType;
@@ -128,6 +119,7 @@ function getProjectManifest(workspaceFolder: vscode.WorkspaceFolder): {
   const javaPomPath = path.join(workspaceFolder.uri.fsPath, "pom.xml");
   const javaGradlePath = path.join(workspaceFolder.uri.fsPath, "build.gradle");
   const rustPath = path.join(workspaceFolder.uri.fsPath, "cargo.tml");
+  const csprojPath = path.join(workspaceFolder.uri.fsPath, "*.csproj");
 
   if (fs.existsSync(packageJsonPath)) {
     return { type: "package.json", path: packageJsonPath };
@@ -142,6 +134,18 @@ function getProjectManifest(workspaceFolder: vscode.WorkspaceFolder): {
   } else if (fs.existsSync(pythonReqPath)) {
     return { type: "requirements.txt", path: pythonReqPath };
   } else {
+    // Search for .csproj files in the directory
+    const files = fs.readdirSync(workspaceFolder.uri.fsPath);
+    const csprojFile = files.find((file) => file.endsWith(".csproj"));
+
+    if (csprojFile) {
+      return {
+        type: "csproj",
+        path: path.join(workspaceFolder.uri.fsPath, csprojFile),
+      };
+    } else {
+      return null;
+    }
     return null;
   }
 }
@@ -156,7 +160,7 @@ function readManifest(
       if (err) {
         return reject(err);
       }
-
+      console.log("Manifest type: ", type);
       switch (type) {
         case "package.json":
           const packageJson = JSON.parse(data);
@@ -166,6 +170,15 @@ function readManifest(
             type: "package.json",
           };
           resolve(obj);
+          break;
+
+        case "composer.json":
+          const composerJson = JSON.parse(data);
+          resolve({
+            dependencies: composerJson.require || {},
+            devDependencies: composerJson["require-dev"] || {},
+            type: "composer.json",
+          });
           break;
 
         case "build.gradle":
@@ -182,15 +195,6 @@ function readManifest(
           });
           break;
 
-        case "composer.json":
-          const composerJson = JSON.parse(data);
-          resolve({
-            dependencies: composerJson.require || {},
-            devDependencies: composerJson["require-dev"] || {},
-            type: "composer.json",
-          });
-          break;
-
         case "pom.xml":
           resolve({
             dependencies: extractMavenDependencies(data),
@@ -202,6 +206,13 @@ function readManifest(
           resolve({
             dependencies: extractCargoDependencies(data),
             type: "cargo.toml",
+          });
+          break;
+
+        case "csproj":
+          resolve({
+            dependencies: extractCsprojDependencies(data),
+            type: "csproj",
           });
           break;
 
@@ -261,6 +272,24 @@ function extractRequirementsTxtDependencies(content: string): string[] {
   return dependencies;
 }
 
+function extractCsprojDependencies(xmlContent: string): string[] {
+  const dependencies: string[] = [];
+  const parser = new xml2js.Parser();
+  parser.parseString(xmlContent, (err: any, result: any) => {
+    if (err) {
+      throw new Error("Error parsing .csproj file");
+    }
+
+    // Traverse the XML to find <PackageReference> nodes
+    const packageReferences = result.Project.ItemGroup.flatMap(
+      (group: any) =>
+        group.PackageReference?.map((ref: any) => ref.$.Include) || []
+    );
+    dependencies.push(...packageReferences);
+  });
+  return dependencies;
+}
+
 // Correcting the usage of readManifest
 export async function checkForTestingPackages(): Promise<void | string> {
   const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -276,13 +305,15 @@ export async function checkForTestingPackages(): Promise<void | string> {
     try {
       const manifestData = await readManifest(manifest.path, manifest.type);
 
-      if (manifestData.type === "package.json") {
+      if (
+        manifestData.type === "package.json" ||
+        manifestData.type === "composer.json"
+      ) {
         const allDependencies = {
           ...manifestData.dependencies,
           ...(manifestData.devDependencies || {}),
         };
 
-        const testingPackages = ["jest", "mocha", "chai", "junit", "pytest"];
         const foundTestingPackages = testingPackages.filter((pkg) =>
           allDependencies.hasOwnProperty(pkg)
         );
@@ -297,12 +328,25 @@ export async function checkForTestingPackages(): Promise<void | string> {
             "No known testing packages found."
           );
         }
-      } else if (manifest.type === "build.gradle") {
-        const gradleData = manifestData as GradleData;
+      } else if (
+        manifest.type === "build.gradle" ||
+        manifest.type === "csproj" ||
+        manifest.type === "requirements.txt" ||
+        manifest.type === "pom.xml" ||
+        manifest.type === "cargo.toml"
+      ) {
+        const dependenciesData = manifestData as singleDependencyArr;
         vscode.window.showInformationMessage(
-          `Found Gradle dependencies: ${gradleData.dependencies.join(", ")}`
+          `Found testing library dependencies: ${dependenciesData.dependencies.join(
+            ", "
+          )}`
         );
-        return gradleData.dependencies.join(", ");
+        return dependenciesData.dependencies.join(", ");
+      } else {
+        console.error(
+          `Unrecognized manifest type: ${manifest.type} \n workspace.ts/checkForTestingPackages`
+        );
+        return;
       }
     } catch (error) {
       vscode.window.showErrorMessage(`Error reading manifest: ${error}`);

@@ -2,6 +2,12 @@ import * as vscode from "vscode";
 import { llama3, defaultURLChat } from "./external/ollama";
 import { WebViewProvider } from "./providers/webViewProvider";
 import fs from "fs/promises";
+import {
+  startingActivationCharacters,
+  endingActivationCharacters,
+  supportedLanguages,
+  supportedLanguagesExtensions,
+} from "./constants/directories";
 
 import {
   clearAllWorkspaceState,
@@ -155,24 +161,31 @@ export async function activate(context: vscode.ExtensionContext) {
               if (!vectorDB) {
                 return;
               }
-              // Read the content of the newly created file
-              const fileContent = await fs.readFile(file.fsPath, "utf8");
+              for (let supportedExtension of supportedLanguagesExtensions) {
+                if (file.fsPath.endsWith(supportedExtension)) {
+                  // Read the content of the newly created file
+                  const fileContent = await fs.readFile(file.fsPath, "utf8");
+                  if (fileContent.trim() === "") {
+                    return;
+                  }
+                  // Count the number of lines
+                  const lineCount = fileContent.split("\n").length;
 
-              // Count the number of lines
-              const lineCount = fileContent.split("\n").length;
+                  // Show line count information
+                  vscode.window.showInformationMessage(
+                    `Embedding new file: ${file.fsPath}.`
+                  );
 
-              // Show line count information
-              vscode.window.showInformationMessage(
-                `Embedding new file: ${file.fsPath}.`
-              );
+                  console.log(
+                    `File created at path: ${file.fsPath} with ${lineCount} lines.`
+                  );
 
-              console.log(
-                `File created at path: ${file.fsPath} with ${lineCount} lines.`
-              );
+                  vectorDB.addItemToVectorStore(fileContent, file.fsPath);
 
-              vectorDB.addItemToVectorStore(fileContent, file.fsPath);
-
-              saveVectorDBToWorkspaceState();
+                  saveVectorDBToWorkspaceState();
+                  break;
+                }
+              }
             } catch (error) {
               vscode.window.showErrorMessage(
                 `Error reading file ${file.fsPath}: ${error}`
@@ -419,38 +432,12 @@ export async function activate(context: vscode.ExtensionContext) {
       })
     );
 
-    const inlineCompletionProvider =
+    context.subscriptions.push(
       vscode.languages.registerInlineCompletionItemProvider(
-        [
-          { language: "javascript" },
-          { language: "typescript" },
-          { language: "python" },
-          { language: "java" },
-          { language: "c" },
-          { language: "cpp" },
-          { language: "csharp" },
-          { language: "go" },
-          { language: "ruby" },
-          { language: "php" },
-          { language: "swift" },
-          { language: "kotlin" },
-          { language: "rust" },
-          { language: "html" },
-          { language: "css" },
-          { language: "sass-indented" },
-          { language: "scss" },
-          { language: "less" },
-          { language: "stylus" },
-          { language: "handlebars" },
-          { language: "javascriptreact" },
-          { language: "typescriptreact" },
-          { language: "vue" },
-        ],
-        /*  { pattern: "**" }, // Applies to all files, adjust the pattern if needed */
-        InlineCompletionProvider // Create an instance of the provider class
-      );
-
-    context.subscriptions.push(inlineCompletionProvider);
+        supportedLanguages,
+        InlineCompletionProvider
+      )
+    );
 
     let lastCheckedDoc = "";
     let lastCheckTime = 0;
@@ -518,12 +505,20 @@ export async function activate(context: vscode.ExtensionContext) {
       const checkAndEmbedDocuments = async () => {
         const doc = getWorkSpaceId();
         const currentTime = Date.now();
-        if (!vectorDB) {
+        let supportedDocument = false;
+        if (!vectorDB || !doc.activeDocument) {
           return;
         }
 
+        for (let extension of supportedLanguagesExtensions) {
+          if (doc.activeDocument.endsWith(extension)) {
+            supportedDocument = true;
+            break;
+          }
+        }
+
         if (
-          doc.activeDocument &&
+          supportedDocument &&
           (lastCheckedDoc !== doc.activeDocument ||
             lastCheckTime + 30000 < currentTime)
         ) {
@@ -602,49 +597,55 @@ export async function activate(context: vscode.ExtensionContext) {
           }
         }
       };
+
       checkAndEmbedDocuments();
 
-      if (
-        event.contentChanges.some((change) => {
-          const position = editor.selection.active;
-          const document = editor.document;
-          const line = document.lineAt(position.line);
-          const lineText = line.text.trim();
-          if (change.text === "\n" && lineText.startsWith("//")) {
-            vscode.window.showInformationMessage("Processing.");
-            checkAndInsertSuggestion();
-          }
+      event.contentChanges.some((change) => {
+        const position = editor.selection.active;
+        const document = editor.document;
+        const line = document.lineAt(position.line);
+        const lineText = line.text.trim();
 
-          return (
-            change.text.endsWith(".") ||
-            change.text.endsWith("[") ||
-            change.text.endsWith("]") ||
-            change.text.endsWith(":") ||
-            change.text.endsWith(";") ||
-            change.text.endsWith("{") ||
-            change.text.endsWith("}") ||
-            change.text.endsWith("=") ||
-            change.text.endsWith("for") ||
-            change.text.endsWith("=>") ||
-            change.text.startsWith("class") ||
-            change.text.startsWith("def") ||
-            change.text.startsWith("function") ||
-            change.text.startsWith("let") ||
-            change.text.startsWith("const") ||
-            change.text.startsWith("int") ||
-            change.text.startsWith("boolean") ||
-            change.text.startsWith("struct") ||
-            change.text.startsWith("long") ||
-            change.text.startsWith("short") ||
-            change.text.startsWith("float") ||
-            change.text.startsWith("double") ||
-            change.text.startsWith("string") ||
-            change.text.startsWith("new")
-          );
-        })
-      ) {
-        checkAndInsertSuggestion();
-      }
+        const doc = getWorkSpaceId();
+        let supportedDocument = false;
+
+        if (!doc.activeDocument) {
+          return;
+        }
+
+        for (let extension of supportedLanguagesExtensions) {
+          if (doc.activeDocument.endsWith(extension)) {
+            supportedDocument = true;
+            break;
+          }
+        }
+
+        //Prevents the extension from prompting the LLM while the user is typing in an unsupported document.
+        if (!supportedDocument) {
+          return;
+        }
+
+        //Checks for inline prompts to the model.
+        if (change.text === "\n" && lineText.startsWith("//")) {
+          vscode.window.showInformationMessage("Processing.");
+          checkAndInsertSuggestion();
+        }
+
+        //Checks if the change begins with or ends with an activation character.
+        for (let activationCharacter of startingActivationCharacters) {
+          if (change.text.startsWith(activationCharacter)) {
+            checkAndInsertSuggestion();
+            return;
+          }
+        }
+
+        for (let activationCharacter of endingActivationCharacters) {
+          if (change.text.endsWith(activationCharacter)) {
+            checkAndInsertSuggestion();
+            return;
+          }
+        }
+      });
     });
 
     // Track when the active text editor changes
