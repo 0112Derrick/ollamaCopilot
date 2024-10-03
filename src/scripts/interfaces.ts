@@ -32,6 +32,8 @@ export type VectorDatabase = {
     metadata_config: {};
     items: IndexItem[];
   }>;
+  clearIndex: () => void;
+  deleteItem: (item: any) => Promise<void>;
 };
 
 export interface ModelResponse {

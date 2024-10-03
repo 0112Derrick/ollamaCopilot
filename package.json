@@ -1,8 +1,14 @@
 {
-  "name": "ollama-copilot",
+  "name": "ollama-copilot-dw",
   "displayName": "Ollama_copilot",
-  "description": "Uses ollama to write code for you similar to copilot",
-  "version": "0.0.1",
+  "description": "Ollama Copilot is a powerful VS Code extension that enables seamless interaction with local Large Language Models (LLMs) and OpenAI for enhanced code assistance. With this extension, developers can easily read and write code using intelligent, AI-driven suggestions tailored to their specific project. Whether it's generating code snippets, autocompleting functions, or refactoring existing code, Ollama Copilot provides a streamlined experience for improving productivity and coding efficiency, all while leveraging the flexibility of local models and OpenAI's capabilities.",
+  "version": "0.0.2",
+  "icon": "media/ollama-icon-01-blk_white.png",
+  "publisher": "derrick-williams",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/0112Derrick/ollamaCopilot"
+  },
   "engines": {
     "vscode": "^1.92.0"
   },
@@ -177,8 +183,5 @@
     "path": "^0.12.7",
     "vectra": "^0.9.0",
     "xml2js": "^0.6.2"
-  },
-  "files": [
-    "dist/**/*"
-  ]
+  }
 }

@@ -48,7 +48,9 @@ export async function activate(context: vscode.ExtensionContext) {
     console.log("Initializing VectraDB...");
     let vectorDB: VectraDB | null = null;
 
-    if (ollamaEmbedURL && ollamaEmbedModel) {
+    let useEmbedding = false;
+
+    if (ollamaEmbedURL && ollamaEmbedModel && useEmbedding) {
       vectorDB = new VectraDB(context);
       console.log("Creating index...");
 
@@ -268,9 +270,6 @@ export async function activate(context: vscode.ExtensionContext) {
               JSON.stringify(savedWorkspaces)
             );
           }
-          vscode.window.showInformationMessage(
-            "Added current workspace to tracked workspaces."
-          );
         }
         vscode.window.showInformationMessage("Embedding workspace successful.");
         console.log("Data saved to workspaceState");
@@ -279,10 +278,13 @@ export async function activate(context: vscode.ExtensionContext) {
       }
     }
 
-    const webview = new WebViewProvider(context, vectorDB as VectorDatabase);
+    const webview = new WebViewProvider(
+      context,
+      vectorDB ? (vectorDB as VectorDatabase) : null
+    );
 
     const inlineSuggestionProvider = new inlineAiSuggestionsProvider(
-      vectorDB as VectorDatabase
+      vectorDB ? (vectorDB as VectorDatabase) : null
     );
 
     if (vectorDB) {
@@ -311,7 +313,7 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.commands.registerCommand("ollama-copilot.clearEmbedData", () => {
         promptForClearWorkspaceEmbeddedData(context);
         if (vectorDB) {
-          vectorDB.clearIndex();
+          (vectorDB as VectorDatabase).clearIndex();
         }
       }),
       vscode.commands.registerCommand(
@@ -417,7 +419,7 @@ export async function activate(context: vscode.ExtensionContext) {
             );
             let id = getWorkSpaceId();
 
-            await vectorDB.addItemToVectorStore(
+            await (vectorDB as VectorDatabase).addItemToVectorStore(
               selectedText,
               id.activeDocument ? id.activeDocument : ""
             );
@@ -557,7 +559,9 @@ export async function activate(context: vscode.ExtensionContext) {
                   `Updating embedding document file: ${currentDoc.documentName}`
                 );
 
-                const vectors = await vectorDB.saveWorkspace();
+                const vectors = await (
+                  vectorDB as VectorDatabase
+                ).saveWorkspace();
                 if (vectors) {
                   // Normalize paths for consistent comparison
                   const currentDocPath = path.normalize(
@@ -578,11 +582,11 @@ export async function activate(context: vscode.ExtensionContext) {
                   );
                   if (updatedVectors) {
                     updatedVectors.forEach(async (item) => {
-                      await vectorDB.deleteItem(item.id);
+                      await (vectorDB as VectorDatabase).deleteItem(item.id);
                     });
                   }
 
-                  vectorDB.addItemToVectorStore(
+                  (vectorDB as VectorDatabase).addItemToVectorStore(
                     fileContent,
                     currentDoc.documentName
                   );
